@@ -1,0 +1,21 @@
+# IDE
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+*.iml
+
+# OS
+.DS_Store
+**/.DS_Store
+
+# Env
+.env*
+
+# LLM related files
+docs/superpowers
+.claude
+.aide.yaml

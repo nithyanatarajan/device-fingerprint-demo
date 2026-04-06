@@ -1,0 +1,81 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.0.5'
+    id 'io.spring.dependency-management' version '1.1.7'
+    id 'com.diffplug.spotless' version '8.3.0'
+    id 'checkstyle'
+    id 'jacoco'
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    runtimeOnly 'com.h2database:h2'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+spotless {
+    java {
+        googleJavaFormat()
+    }
+}
+
+checkstyle {
+    toolVersion = '13.3.0'
+    configFile = file("${rootDir}/config/checkstyle/checkstyle.xml")
+}
+
+jacoco {
+    toolVersion = '0.8.14'
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+jacocoTestCoverageVerification {
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: ['com/example/deviceid/DeviceIdApplication.class'])
+        }))
+    }
+    violationRules {
+        rule {
+            limit {
+                minimum = 0.90
+            }
+        }
+    }
+}
+
+test {
+    useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+tasks.named('check') {
+    dependsOn jacocoTestCoverageVerification
+}
+
+tasks.register('checkCI') {
+    description = 'Run all CI checks: spotless, checkstyle, build, test, coverage'
+    dependsOn 'spotlessCheck', 'checkstyleMain', 'checkstyleTest', 'build', 'jacocoTestCoverageVerification'
+}

@@ -18,7 +18,7 @@ class CollectionServiceTest {
 
   @Test
   void firstVisitShouldCreateUserAndDevice() {
-    CollectResponse response = collectionService.collect(createRequest("testuser"));
+    CollectResponse response = collectionService.collect(createRequest("testuser"), "203.0.113.10");
 
     assertThat(response.userId()).isNotNull();
     assertThat(response.deviceId()).isNotNull();
@@ -28,8 +28,8 @@ class CollectionServiceTest {
 
   @Test
   void returnVisitShouldMatchDevice() {
-    collectionService.collect(createRequest("testuser"));
-    CollectResponse second = collectionService.collect(createRequest("testuser"));
+    collectionService.collect(createRequest("testuser"), "203.0.113.10");
+    CollectResponse second = collectionService.collect(createRequest("testuser"), "203.0.113.10");
 
     assertThat(second.matchResult()).isEqualTo(MatchResult.SAME_DEVICE);
     assertThat(second.score()).isGreaterThan(0);
@@ -37,24 +37,44 @@ class CollectionServiceTest {
 
   @Test
   void differentDeviceShouldBeDetected() {
-    collectionService.collect(createRequest("testuser"));
-    CollectResponse second = collectionService.collect(createDifferentDeviceRequest("testuser"));
+    collectionService.collect(createRequest("testuser"), "203.0.113.10");
+    CollectResponse second =
+        collectionService.collect(createDifferentDeviceRequest("testuser"), "203.0.113.10");
 
     assertThat(second.matchResult()).isEqualTo(MatchResult.NEW_DEVICE);
   }
 
   @Test
   void nameShouldBeCaseInsensitive() {
-    CollectResponse first = collectionService.collect(createRequest("TestUser"));
-    CollectResponse second = collectionService.collect(createRequest("testuser"));
+    CollectResponse first = collectionService.collect(createRequest("TestUser"), "203.0.113.10");
+    CollectResponse second = collectionService.collect(createRequest("testuser"), "203.0.113.10");
 
     assertThat(first.userId()).isEqualTo(second.userId());
     assertThat(second.matchResult()).isEqualTo(MatchResult.SAME_DEVICE);
   }
 
   @Test
+  void responseShouldIncludeMachineMatchPopulated() {
+    CollectResponse response = collectionService.collect(createRequest("testuser"), "203.0.113.10");
+
+    assertThat(response.machineMatch()).isNotNull();
+    assertThat(response.machineMatch().matches()).isEmpty();
+  }
+
+  @Test
+  void crossUserSameMachineShouldSurfacePriorIdentity() {
+    CollectResponse first = collectionService.collect(createRequest("userA"), "203.0.113.10");
+    CollectResponse second = collectionService.collect(createRequest("userB"), "203.0.113.10");
+
+    assertThat(second.machineMatch()).isNotNull();
+    assertThat(second.machineMatch().matches()).hasSize(1);
+    assertThat(second.machineMatch().matches().get(0).deviceId()).isEqualTo(first.deviceId());
+    assertThat(second.machineMatch().matches().get(0).userId()).isEqualTo(first.userId());
+  }
+
+  @Test
   void returnVisitWithChangedSignalsShouldReportChanges() {
-    collectionService.collect(createRequest("testuser"));
+    collectionService.collect(createRequest("testuser"), "203.0.113.10");
 
     CollectRequest modified =
         new CollectRequest(
@@ -75,7 +95,7 @@ class CollectionServiceTest {
             false,
             true);
 
-    CollectResponse response = collectionService.collect(modified);
+    CollectResponse response = collectionService.collect(modified, "203.0.113.10");
 
     // Should still match (canvas, webgl, etc. are same) but with some changes
     assertThat(response.matchResult()).isNotEqualTo(MatchResult.NEW_DEVICE);

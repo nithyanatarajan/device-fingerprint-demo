@@ -12,4 +12,5 @@ public record CollectResponse(
     MatchResult matchResult,
     double score,
     List<SignalComparisonResult> signalComparisons,
-    List<String> changedSignals) {}
+    List<String> changedSignals,
+    MachineMatchResult machineMatch) {}

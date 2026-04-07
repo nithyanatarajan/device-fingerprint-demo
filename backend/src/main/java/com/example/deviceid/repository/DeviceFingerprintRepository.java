@@ -15,4 +15,8 @@ public interface DeviceFingerprintRepository extends JpaRepository<DeviceFingerp
 
   /** Finds the most recent fingerprint for a device. */
   Optional<DeviceFingerprint> findTopByDeviceOrderByCollectedAtDesc(Device device);
+
+  /** Finds all fingerprints sharing the given machine signature and public IP. */
+  List<DeviceFingerprint> findByMachineSignatureAndPublicIp(
+      String machineSignature, String publicIp);
 }

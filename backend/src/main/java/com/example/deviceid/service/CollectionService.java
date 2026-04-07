@@ -6,6 +6,7 @@ import com.example.deviceid.domain.MatchResult;
 import com.example.deviceid.domain.User;
 import com.example.deviceid.dto.CollectRequest;
 import com.example.deviceid.dto.CollectResponse;
+import com.example.deviceid.dto.MachineMatchResult;
 import com.example.deviceid.dto.ScoringResult;
 import com.example.deviceid.dto.SignalComparisonResult;
 import com.example.deviceid.repository.DeviceFingerprintRepository;
@@ -31,6 +32,8 @@ public class CollectionService {
   private final ScoringEngine scoringEngine;
   private final ScoringConfigService scoringConfigService;
   private final DeviceLabelGenerator labelGenerator;
+  private final MachineSignatureService machineSignatureService;
+  private final MachineMatchService machineMatchService;
 
   /** Creates the collection service with required dependencies. */
   public CollectionService(
@@ -39,17 +42,21 @@ public class CollectionService {
       DeviceFingerprintRepository fingerprintRepository,
       ScoringEngine scoringEngine,
       ScoringConfigService scoringConfigService,
-      DeviceLabelGenerator labelGenerator) {
+      DeviceLabelGenerator labelGenerator,
+      MachineSignatureService machineSignatureService,
+      MachineMatchService machineMatchService) {
     this.userRepository = userRepository;
     this.deviceRepository = deviceRepository;
     this.fingerprintRepository = fingerprintRepository;
     this.scoringEngine = scoringEngine;
     this.scoringConfigService = scoringConfigService;
     this.labelGenerator = labelGenerator;
+    this.machineSignatureService = machineSignatureService;
+    this.machineMatchService = machineMatchService;
   }
 
   /** Collects a fingerprint, matches against known devices, and returns the result. */
-  public CollectResponse collect(CollectRequest request) {
+  public CollectResponse collect(CollectRequest request, String publicIp) {
     User user = findOrCreateUser(request.name());
     DeviceFingerprint incoming = buildFingerprint(request, null);
     List<Device> devices = deviceRepository.findByUser(user);
@@ -83,9 +90,12 @@ public class CollectionService {
       deviceRepository.save(bestDevice);
 
       DeviceFingerprint savedFp = buildFingerprint(request, bestDevice);
+      savedFp.setMachineSignature(machineSignatureService.computeSignature(savedFp));
+      savedFp.setPublicIp(publicIp);
       fingerprintRepository.save(savedFp);
 
       List<String> changedSignals = findChangedSignals(bestResult.signalComparisons());
+      MachineMatchResult machineMatch = machineMatchService.findMatches(savedFp);
 
       return new CollectResponse(
           user.getId(),
@@ -94,7 +104,8 @@ public class CollectionService {
           bestResult.matchResult(),
           bestResult.score(),
           bestResult.signalComparisons(),
-          changedSignals);
+          changedSignals,
+          machineMatch);
     }
 
     // New device
@@ -103,7 +114,11 @@ public class CollectionService {
     deviceRepository.save(newDevice);
 
     DeviceFingerprint savedFp = buildFingerprint(request, newDevice);
+    savedFp.setMachineSignature(machineSignatureService.computeSignature(savedFp));
+    savedFp.setPublicIp(publicIp);
     fingerprintRepository.save(savedFp);
+
+    MachineMatchResult machineMatch = machineMatchService.findMatches(savedFp);
 
     return new CollectResponse(
         user.getId(),
@@ -112,7 +127,8 @@ public class CollectionService {
         MatchResult.NEW_DEVICE,
         0.0,
         Collections.emptyList(),
-        Collections.emptyList());
+        Collections.emptyList(),
+        machineMatch);
   }
 
   private User findOrCreateUser(String name) {

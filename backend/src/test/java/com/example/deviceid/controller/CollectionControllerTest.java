@@ -41,6 +41,85 @@ class CollectionControllerTest {
   }
 
   @Test
+  void forwardedHeaderShouldTakePrecedenceOverRemoteAddr() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/collect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("X-Forwarded-For", "203.0.113.55")
+                .with(
+                    req -> {
+                      req.setRemoteAddr("10.0.0.1");
+                      return req;
+                    })
+                .content(collectRequestJson("userA")))
+        .andExpect(status().isOk());
+
+    mockMvc
+        .perform(
+            post("/api/collect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("X-Forwarded-For", "203.0.113.55")
+                .with(
+                    req -> {
+                      req.setRemoteAddr("10.0.0.99");
+                      return req;
+                    })
+                .content(collectRequestJson("userB")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.machineMatch.matches[0].userName").value("usera"));
+  }
+
+  @Test
+  void forwardedHeaderWithMultipleIpsShouldTakeFirst() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/collect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("X-Forwarded-For", "203.0.113.77")
+                .content(collectRequestJson("userA")))
+        .andExpect(status().isOk());
+
+    mockMvc
+        .perform(
+            post("/api/collect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("X-Forwarded-For", "203.0.113.77, 10.0.0.1, 10.0.0.2")
+                .content(collectRequestJson("userB")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.machineMatch.matches[0].userName").value("usera"));
+  }
+
+  @Test
+  void absentForwardedHeaderShouldFallBackToRemoteAddr() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/collect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .with(
+                    req -> {
+                      req.setRemoteAddr("198.51.100.42");
+                      return req;
+                    })
+                .content(collectRequestJson("userA")))
+        .andExpect(status().isOk());
+
+    mockMvc
+        .perform(
+            post("/api/collect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("X-Forwarded-For", "  ")
+                .with(
+                    req -> {
+                      req.setRemoteAddr("198.51.100.42");
+                      return req;
+                    })
+                .content(collectRequestJson("userB")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.machineMatch.matches[0].userName").value("usera"));
+  }
+
+  @Test
   void postCollectShouldReturnSameDeviceOnReturnVisit() throws Exception {
     mockMvc
         .perform(

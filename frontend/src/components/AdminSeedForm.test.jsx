@@ -10,7 +10,7 @@ vi.mock('../services/api', () => ({
   seedScenario: vi.fn(),
 }));
 
-import { seedDemoUser, getSeedSummary, clearSeedData } from '../services/api';
+import { seedDemoUser, getSeedSummary, clearSeedData, seedScenario } from '../services/api';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -148,6 +148,47 @@ describe('AdminSeedForm', () => {
     await user.click(screen.getByRole('button', { name: 'Seed' }));
     await waitFor(() => {
       expect(screen.getByText('seed boom')).toBeInTheDocument();
+    });
+  });
+
+  it('renders the curated scenario seed button and explanation', () => {
+    render(<AdminSeedForm />);
+    expect(screen.getByText('Curated demo scenario')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Seed demo scenario' })).toBeEnabled();
+    expect(screen.getByText(/5 users designed to sit at varied points/)).toBeInTheDocument();
+  });
+
+  it('seeds the curated scenario and surfaces a snackbar', async () => {
+    const user = userEvent.setup();
+    seedScenario.mockResolvedValue([
+      { userId: 'u1' },
+      { userId: 'u2' },
+      { userId: 'u3' },
+      { userId: 'u4' },
+      { userId: 'u5' },
+    ]);
+    const onChanged = vi.fn();
+
+    render(<AdminSeedForm onChanged={onChanged} />);
+    await user.click(screen.getByRole('button', { name: 'Seed demo scenario' }));
+
+    await waitFor(() => {
+      expect(seedScenario).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/Seeded scenario: 5 curated user/)).toBeInTheDocument();
+    });
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  it('shows error when seedScenario fails', async () => {
+    const user = userEvent.setup();
+    seedScenario.mockRejectedValue(new Error('scenario boom'));
+    render(<AdminSeedForm />);
+
+    await user.click(screen.getByRole('button', { name: 'Seed demo scenario' }));
+    await waitFor(() => {
+      expect(screen.getByText('scenario boom')).toBeInTheDocument();
     });
   });
 });

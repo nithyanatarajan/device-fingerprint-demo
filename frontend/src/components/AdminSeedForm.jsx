@@ -20,7 +20,8 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogActions from '@mui/material/DialogActions';
 import Snackbar from '@mui/material/Snackbar';
 import CircularProgress from '@mui/material/CircularProgress';
-import { seedDemoUser, getSeedSummary, clearSeedData } from '../services/api';
+import Divider from '@mui/material/Divider';
+import { seedDemoUser, getSeedSummary, clearSeedData, seedScenario } from '../services/api';
 
 const MATCH_COLORS = {
   SAME_DEVICE: 'success',
@@ -58,6 +59,7 @@ export default function AdminSeedForm({ onChanged }) {
   const [summary, setSummary] = useState(null);
   const [clearing, setClearing] = useState(false);
   const [snackbar, setSnackbar] = useState(null);
+  const [scenarioSeeding, setScenarioSeeding] = useState(false);
 
   const validName = nameSuffix.length > 0 && VALID_SUFFIX.test(nameSuffix);
 
@@ -109,6 +111,23 @@ export default function AdminSeedForm({ onChanged }) {
     }
   };
 
+  const handleSeedScenario = async () => {
+    setScenarioSeeding(true);
+    setError(null);
+    try {
+      const outcomes = await seedScenario();
+      setSnackbar(
+        `Seeded scenario: ${outcomes.length} curated user(s) ready. Drag canvas_hash to see flips.`,
+      );
+      setLastResult(null);
+      if (onChanged) onChanged();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setScenarioSeeding(false);
+    }
+  };
+
   // Allow Escape / cancel without leaving dialog state stale
   useEffect(() => {
     if (!dialogOpen) setSummary(null);
@@ -121,6 +140,29 @@ export default function AdminSeedForm({ onChanged }) {
           {error}
         </Alert>
       )}
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="subtitle2" gutterBottom>
+          Curated demo scenario
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          One click seeds 5 users designed to sit at varied points on the score curve, so dragging
+          high-leverage sliders produces visible classification flips. Wipes existing demo data.
+        </Typography>
+        <Button
+          variant="contained"
+          color="secondary"
+          onClick={handleSeedScenario}
+          disabled={scenarioSeeding}
+          data-testid="seed-scenario-button"
+        >
+          {scenarioSeeding ? <CircularProgress size={20} /> : 'Seed demo scenario'}
+        </Button>
+      </Box>
+      <Divider sx={{ mb: 2 }}>
+        <Typography variant="caption" color="text.secondary">
+          or seed one user at a time
+        </Typography>
+      </Divider>
       <Stack spacing={2}>
         <TextField
           label="User name"

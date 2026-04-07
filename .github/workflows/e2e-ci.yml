@@ -15,6 +15,10 @@ on:
       - '.github/workflows/e2e-ci.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+  checks: read
+
 jobs:
   detect-changes:
     runs-on: ubuntu-latest

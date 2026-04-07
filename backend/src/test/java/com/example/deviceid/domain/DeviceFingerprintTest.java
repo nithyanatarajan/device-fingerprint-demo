@@ -28,6 +28,8 @@ class DeviceFingerprintTest {
     fp.setDntEnabled(false);
     fp.setCookieEnabled(true);
     fp.setRawSignals("{\"raw\":true}");
+    fp.setMachineSignature("a".repeat(64));
+    fp.setPublicIp("203.0.113.42");
 
     assertThat(fp.getCanvasHash()).isEqualTo("abc123");
     assertThat(fp.getWebglRenderer()).isEqualTo("NVIDIA GeForce");
@@ -45,6 +47,8 @@ class DeviceFingerprintTest {
     assertThat(fp.getDntEnabled()).isFalse();
     assertThat(fp.getCookieEnabled()).isTrue();
     assertThat(fp.getRawSignals()).isEqualTo("{\"raw\":true}");
+    assertThat(fp.getMachineSignature()).isEqualTo("a".repeat(64));
+    assertThat(fp.getPublicIp()).isEqualTo("203.0.113.42");
     assertThat(fp.getDevice()).isSameAs(device);
   }
 
@@ -57,6 +61,8 @@ class DeviceFingerprintTest {
     assertThat(fp.getCanvasHash()).isNull();
     assertThat(fp.getDeviceMemory()).isNull();
     assertThat(fp.getDntEnabled()).isNull();
+    assertThat(fp.getMachineSignature()).isNull();
+    assertThat(fp.getPublicIp()).isNull();
     assertThat(fp.getId()).isNull();
     assertThat(fp.getCollectedAt()).isNull();
   }

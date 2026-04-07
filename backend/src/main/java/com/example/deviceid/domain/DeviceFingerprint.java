@@ -57,6 +57,12 @@ public class DeviceFingerprint {
   private Boolean dntEnabled;
   private Boolean cookieEnabled;
 
+  @Column(length = 64)
+  private String machineSignature;
+
+  @Column(length = 45)
+  private String publicIp;
+
   /** JPA requires a no-arg constructor. */
   protected DeviceFingerprint() {}
 
@@ -208,5 +214,21 @@ public class DeviceFingerprint {
 
   public void setCookieEnabled(Boolean cookieEnabled) {
     this.cookieEnabled = cookieEnabled;
+  }
+
+  public String getMachineSignature() {
+    return machineSignature;
+  }
+
+  public void setMachineSignature(String machineSignature) {
+    this.machineSignature = machineSignature;
+  }
+
+  public String getPublicIp() {
+    return publicIp;
+  }
+
+  public void setPublicIp(String publicIp) {
+    this.publicIp = publicIp;
   }
 }

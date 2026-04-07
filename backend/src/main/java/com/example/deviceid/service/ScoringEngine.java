@@ -84,8 +84,13 @@ public class ScoringEngine {
     return new ScoringResult(compositeScore, matchResult, comparisons);
   }
 
+  /**
+   * Reads the raw value of a single signal from a fingerprint. Package-private so {@link
+   * DeviceInvestigationService} can iterate the same signal set without duplicating the
+   * field-by-field switch.
+   */
   @SuppressWarnings("CyclomaticComplexity")
-  private Object getSignalValue(DeviceFingerprint fp, String signalName) {
+  Object getSignalValue(DeviceFingerprint fp, String signalName) {
     return switch (signalName) {
       case "canvas_hash" -> fp.getCanvasHash();
       case "webgl_renderer" -> fp.getWebglRenderer();

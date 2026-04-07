@@ -3,12 +3,14 @@ package com.example.deviceid.controller;
 import com.example.deviceid.domain.Device;
 import com.example.deviceid.domain.DeviceFingerprint;
 import com.example.deviceid.domain.User;
+import com.example.deviceid.dto.DeviceInvestigation;
 import com.example.deviceid.dto.DeviceSummary;
 import com.example.deviceid.dto.UserDetail;
 import com.example.deviceid.dto.UserSummary;
 import com.example.deviceid.repository.DeviceFingerprintRepository;
 import com.example.deviceid.repository.DeviceRepository;
 import com.example.deviceid.repository.UserRepository;
+import com.example.deviceid.service.DeviceInvestigationService;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,15 +36,18 @@ public class UserController {
   private final UserRepository userRepository;
   private final DeviceRepository deviceRepository;
   private final DeviceFingerprintRepository fingerprintRepository;
+  private final DeviceInvestigationService deviceInvestigationService;
 
   /** Creates the controller with required repositories. */
   public UserController(
       UserRepository userRepository,
       DeviceRepository deviceRepository,
-      DeviceFingerprintRepository fingerprintRepository) {
+      DeviceFingerprintRepository fingerprintRepository,
+      DeviceInvestigationService deviceInvestigationService) {
     this.userRepository = userRepository;
     this.deviceRepository = deviceRepository;
     this.fingerprintRepository = fingerprintRepository;
+    this.deviceInvestigationService = deviceInvestigationService;
   }
 
   /** Lists all users with their device counts. */
@@ -77,6 +82,17 @@ public class UserController {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
     return deviceRepository.findByUser(user).stream().map(this::toDeviceSummary).toList();
+  }
+
+  /**
+   * Returns the full investigation payload for one device — visit history plus a per-signal match
+   * explanation comparing the latest visit against the previous visit under the currently saved
+   * scoring config. Drives the Tuning Console's "why was this matched?" modal.
+   */
+  @GetMapping("/{userId}/devices/{deviceId}/investigation")
+  public DeviceInvestigation investigateDevice(
+      @PathVariable UUID userId, @PathVariable UUID deviceId) {
+    return deviceInvestigationService.investigate(userId, deviceId);
   }
 
   private DeviceSummary toDeviceSummary(Device device) {

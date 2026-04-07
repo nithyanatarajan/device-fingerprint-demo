@@ -130,6 +130,106 @@ class UserControllerTest {
         .andExpect(status().isNotFound());
   }
 
+  @Test
+  void investigateDeviceReturnsVisitsAndMatchExplanationForMultiVisitDevice() throws Exception {
+    // First visit creates the device
+    MvcResult first =
+        mockMvc
+            .perform(
+                post("/api/collect")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(collectJson("investuser")))
+            .andReturn();
+    String body = first.getResponse().getContentAsString();
+    String userId =
+        body.substring(
+            body.indexOf("\"userId\":\"") + 10,
+            body.indexOf("\"", body.indexOf("\"userId\":\"") + 10));
+    String deviceId =
+        body.substring(
+            body.indexOf("\"deviceId\":\"") + 12,
+            body.indexOf("\"", body.indexOf("\"deviceId\":\"") + 12));
+
+    // Second visit produces a second fingerprint on the same device
+    mockMvc.perform(
+        post("/api/collect")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(collectJson("investuser")));
+
+    mockMvc
+        .perform(get("/api/users/" + userId + "/devices/" + deviceId + "/investigation"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.deviceId").value(deviceId))
+        .andExpect(jsonPath("$.deviceLabel").isNotEmpty())
+        .andExpect(jsonPath("$.visits").isArray())
+        .andExpect(jsonPath("$.visits.length()").value(2))
+        .andExpect(jsonPath("$.matchExplanation").exists())
+        .andExpect(jsonPath("$.matchExplanation.compositeScore").value(100.0))
+        .andExpect(jsonPath("$.matchExplanation.classification").value("SAME_DEVICE"))
+        .andExpect(jsonPath("$.matchExplanation.contributions").isArray())
+        .andExpect(jsonPath("$.matchExplanation.contributions.length()").value(15));
+  }
+
+  @Test
+  void investigateDeviceReturnsNullExplanationForSingleVisitDevice() throws Exception {
+    MvcResult result =
+        mockMvc
+            .perform(
+                post("/api/collect")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(collectJson("singleuser")))
+            .andReturn();
+    String body = result.getResponse().getContentAsString();
+    String userId =
+        body.substring(
+            body.indexOf("\"userId\":\"") + 10,
+            body.indexOf("\"", body.indexOf("\"userId\":\"") + 10));
+    String deviceId =
+        body.substring(
+            body.indexOf("\"deviceId\":\"") + 12,
+            body.indexOf("\"", body.indexOf("\"deviceId\":\"") + 12));
+
+    mockMvc
+        .perform(get("/api/users/" + userId + "/devices/" + deviceId + "/investigation"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.visits.length()").value(1))
+        .andExpect(jsonPath("$.matchExplanation").doesNotExist());
+  }
+
+  @Test
+  void investigateDeviceForUnknownUserShouldReturn404() throws Exception {
+    mockMvc
+        .perform(
+            get(
+                "/api/users/00000000-0000-0000-0000-000000000000/devices/"
+                    + "00000000-0000-0000-0000-000000000001/investigation"))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void investigateDeviceForUnknownDeviceShouldReturn404() throws Exception {
+    MvcResult result =
+        mockMvc
+            .perform(
+                post("/api/collect")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(collectJson("orphanuser")))
+            .andReturn();
+    String body = result.getResponse().getContentAsString();
+    String userId =
+        body.substring(
+            body.indexOf("\"userId\":\"") + 10,
+            body.indexOf("\"", body.indexOf("\"userId\":\"") + 10));
+
+    mockMvc
+        .perform(
+            get(
+                "/api/users/"
+                    + userId
+                    + "/devices/00000000-0000-0000-0000-000000000099/investigation"))
+        .andExpect(status().isNotFound());
+  }
+
   private String collectJson(String name) {
     return """
         {

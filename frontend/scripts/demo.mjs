@@ -52,6 +52,7 @@ const NGROK_DISCONNECT_TIMEOUT_MS = 2000;
 
 const children = [];
 let tunnelListener = null;
+let keepaliveTimer = null;
 let cleaningUp = false;
 let interruptCount = 0;
 
@@ -116,20 +117,12 @@ function ngrokConfigPaths() {
 }
 
 async function resolveNgrokAuthtoken() {
-  // 1. Environment variable
   if (process.env.NGROK_AUTHTOKEN) {
-    return {
-      token: process.env.NGROK_AUTHTOKEN,
-      source: 'NGROK_AUTHTOKEN env var',
-    };
+    return { token: process.env.NGROK_AUTHTOKEN, source: 'NGROK_AUTHTOKEN env var' };
   }
-
-  // 2. Standalone CLI config file
   for (const path of ngrokConfigPaths()) {
     try {
       const content = await readFile(path, 'utf-8');
-      // Match `authtoken: <value>` at the start of a line. Handles optional
-      // surrounding quotes and trailing whitespace.
       const match = content.match(/^\s*authtoken:\s*["']?([^\s"']+)["']?\s*$/m);
       if (match?.[1]) {
         return { token: match[1], source: path };
@@ -138,7 +131,6 @@ async function resolveNgrokAuthtoken() {
       // file does not exist or is unreadable, try the next candidate
     }
   }
-
   return null;
 }
 
@@ -155,6 +147,11 @@ async function cleanup(exitCode = 0) {
   if (cleaningUp) return;
   cleaningUp = true;
   log('🧹', 'shutting down...');
+
+  if (keepaliveTimer) {
+    clearInterval(keepaliveTimer);
+    keepaliveTimer = null;
+  }
 
   // Hard deadline: no matter what hangs below, force exit after this timeout.
   const hardKillTimer = setTimeout(() => {
@@ -224,7 +221,7 @@ process.on('uncaughtException', (err) => {
 async function ensureBackend() {
   if (await isPortInUse(BACKEND_PORT)) {
     log('•', `backend already running on ${BACKEND_PORT}, reusing existing process`);
-    return;
+    return false;
   }
   // --no-daemon is critical: gradle's daemon runs in its own process group and
   // survives SIGTERM to the wrapper, leaving a zombie JVM holding port 8080.
@@ -232,15 +229,41 @@ async function ensureBackend() {
   // cleaned up when we kill the wrapper's process group.
   spawnChild('backend', './gradlew', ['--no-daemon', 'bootRun'], { cwd: BACKEND_DIR });
   await waitForUrl(BACKEND_HEALTH_URL, 'backend');
+  return true;
 }
 
 async function ensureFrontend() {
   if (await isPortInUse(FRONTEND_PORT)) {
     log('•', `frontend already running on ${FRONTEND_PORT}, reusing existing process`);
-    return;
+    return false;
   }
   spawnChild('frontend', 'npx', ['vite'], { cwd: FRONTEND_DIR });
   await waitForUrl(FRONTEND_HEALTH_URL, 'frontend');
+  return true;
+}
+
+async function startTunnel(authtoken) {
+  log('🌐', `starting ngrok tunnel against http://localhost:${FRONTEND_PORT}...`);
+  try {
+    return await ngrok.forward({ addr: FRONTEND_PORT, authtoken });
+  } catch (err) {
+    // ngrok.forward errors are often opaque (e.g. "ERR_NGROK_108: account
+    // limited to 1 simultaneous tunnel"). Surface the message and the most
+    // common causes so the user can act without grepping ngrok docs.
+    const message = err?.message || String(err);
+    throw new Error(
+      [
+        `ngrok.forward failed: ${message}`,
+        '',
+        'Common causes:',
+        '  • A previous tunnel from this account is still open. Visit',
+        '    https://dashboard.ngrok.com/agents to revoke stale agents,',
+        '    or run `pkill -f ngrok` to clear local agents.',
+        '  • Invalid or expired authtoken. Re-run `ngrok config add-authtoken <token>`.',
+        '  • Network or firewall blocking outbound connections to ngrok.',
+      ].join('\n'),
+    );
+  }
 }
 
 async function main() {
@@ -260,14 +283,14 @@ async function main() {
   log('🔑', `authtoken loaded from ${auth.source}`);
 
   log('━', 'bringing up the stack');
-  await ensureBackend();
-  await ensureFrontend();
+  const startedBackend = await ensureBackend();
+  const startedFrontend = await ensureFrontend();
 
-  log('🌐', 'starting ngrok tunnel...');
-  tunnelListener = await ngrok.forward({
-    addr: FRONTEND_PORT,
-    authtoken: auth.token,
-  });
+  if (!startedBackend && !startedFrontend) {
+    log('•', 'tunnel-only mode — both apps were already running, npm run demo will only manage ngrok');
+  }
+
+  tunnelListener = await startTunnel(auth.token);
 
   const url = tunnelListener.url();
   process.stdout.write('\n');
@@ -282,8 +305,14 @@ async function main() {
     '(Reused processes — backend or frontend you started yourself — will be left running.)\n\n',
   );
 
-  // Keep the process alive until SIGINT.
-  await new Promise(() => {});
+  // Keep the Node event loop alive while the tunnel runs. The @ngrok/ngrok
+  // SDK does not register a libuv handle of its own, and `await new Promise`
+  // is just a microtask — neither keeps Node from exiting once spawned
+  // children (if any) are gone. A long-period setInterval is the standard
+  // idiom for "stay alive until SIGINT". This was the bug behind the earlier
+  // "tunnel opens then immediately dies / ERR_NGROK_3200" symptom in
+  // tunnel-only mode (no children to keep the loop alive).
+  keepaliveTimer = setInterval(() => {}, 1 << 30);
 }
 
 main().catch((err) => {

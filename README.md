@@ -99,6 +99,14 @@ The script:
 
 Press `Ctrl+C` to tear everything down cleanly. Only processes the script started are killed; existing dev servers you started yourself keep running.
 
+**Tunnel-only mode is automatic.** If both backend and frontend are already running on their ports when you run `npm run demo`, the script detects them, skips starting new ones, and just opens the ngrok tunnel. `Ctrl+C` then closes only the tunnel — your dev servers are untouched.
+
+**Stopping ngrok safely:**
+
+- **From the same terminal that started it:** press `Ctrl+C`. The script disconnects the tunnel cleanly and only kills processes it started itself.
+- **From a different shell, if the script hangs:** `pkill -f "node scripts/demo.mjs"`. As a last resort to clear all local ngrok agents: `pkill -f ngrok`.
+- **Stale tunnels on the ngrok side** (free tier allows only one simultaneous tunnel — a previous run that didn't disconnect cleanly will block the next one): visit <https://dashboard.ngrok.com/agents> and revoke the stale agent.
+
 > **Note on the SDK and the CLI config file:** the `@ngrok/ngrok` Node SDK is a separate Rust binary embedded in the Node module — it does *not* automatically read the standalone `ngrok` CLI's config file. The demo script reads the file itself and passes the token explicitly, so `ngrok config add-authtoken <token>` is sufficient and you do not also need to set `NGROK_AUTHTOKEN`.
 
 ## Testing

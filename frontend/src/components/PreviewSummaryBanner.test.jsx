@@ -3,10 +3,11 @@ import { describe, it, expect } from 'vitest';
 import PreviewSummaryBanner from './PreviewSummaryBanner';
 
 describe('PreviewSummaryBanner', () => {
-  it('renders the idle hint and high-leverage tip when summary is null', () => {
+  it('renders the idle hints (threshold-first + high-leverage) when summary is null', () => {
     render(<PreviewSummaryBanner summary={null} />);
     expect(screen.getByTestId('preview-summary-banner')).toBeInTheDocument();
     expect(screen.getByText(/Drag any weight or threshold slider/)).toBeInTheDocument();
+    expect(screen.getByText(/Try the threshold sliders first/)).toBeInTheDocument();
     expect(
       screen.getByText(/canvas_hash \(90\), webgl_renderer \(85\), and touch_support \(70\)/),
     ).toBeInTheDocument();

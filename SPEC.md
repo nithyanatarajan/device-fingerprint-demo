@@ -197,7 +197,42 @@ Each phase is demo-able on its own. If time runs out at any phase boundary, we s
 - `POST /api/collect` — name + signals -> match result (new device / matched device with score / drift detected)
 - `GET /api/users/{userId}/devices` — list user's known devices
 
-### Phase 2: Scoring Engine + Tuning Console
+### Phase 2: Cross-Browser Machine Identification
+
+A second identity axis on top of Phase 1. Phase 1 matches per-browser fingerprints; this phase recognizes the same **hardware** across different browsers on the same machine, purely additive and without touching the per-browser scoring pipeline.
+
+**Demo moment this enables:** "Enter your name in Chrome, then switch to Firefox and enter a different name. The system registers a new user — but also tells you: *this machine was also used by your previous name*. Hardware doesn't lie."
+
+**Signals used (hardware only, browser-independent):**
+- `timezone`
+- `platform`
+- `screenResolution`
+- `colorDepth`
+- `hardwareConcurrency`
+- `deviceMemory`
+- `touchSupport`
+
+Browser-specific signals (canvas, webgl, userAgent, codecs) are deliberately **excluded** from the hash so the signature is stable across browsers on the same machine.
+
+**Design:**
+- **Exact-match SHA-256 hash** over the hardware signals in canonical order. Stored as a column on `DeviceFingerprint`. Swappable to fuzzy matching later as an internal refactor.
+- **Public IP as a hard co-match requirement**, not a confidence modifier. Captured from the HTTP request (`X-Forwarded-For` → `RemoteAddr`). Match query requires both `machineSignature` AND `publicIp` to match. Two identical machines on different networks never collide — false negatives preferred over false positives for credibility.
+- **No VPN detection, no IP geolocation, no ASN lookup.** The product only claims what it can prove. If the network differs, no match is shown; we do not guess between "moved to café" and "VPN enabled".
+- **Cross-user matching is intentional.** Same-user matches are also included for consistency.
+- **Self-matches excluded** (the current device's own prior fingerprints don't appear in its own panel).
+
+**APIs:**
+- `POST /api/collect` response extended with a non-breaking `machineMatch` field: `{ matches: [{ userId, userName, deviceId, deviceLabel, lastSeenAt }] }`. Empty list when no match.
+
+**Frontend:**
+- New `Same Machine` panel below the existing match result on the collection page
+- Hidden entirely when `matches` is empty — no empty-state card
+- No confidence chip, no "same network" tag — the presence of the match is the signal
+- Small footer caveat: *"Based on device hardware and network. Identical machines on the same network may appear as one."*
+
+**Known limitation (documented in the UI):** Two identical hardware configurations on the same Wi-Fi produce a false positive. This is an intrinsic limit of device-level fingerprinting with browser-accessible signals — resolving it requires higher-entropy inputs (mouse dynamics, keystroke timing) which belong to a later phase, if at all.
+
+### Phase 3: Scoring Engine + Tuning Console
 
 **Scoring Engine (backend):**
 - Weighted similarity scoring as described in the Scoring Engine section
@@ -222,7 +257,7 @@ Each phase is demo-able on its own. If time runs out at any phase boundary, we s
 - `GET /api/scoring/config` — thresholds
 - `PUT /api/scoring/config` — update thresholds
 
-### Phase 3: Ripple Effect
+### Phase 4: Ripple Effect
 
 When an admin adjusts weights or thresholds in the tuning console, the UI shows how the change impacts device recognition across all users **before saving**.
 
@@ -240,7 +275,7 @@ When an admin adjusts weights or thresholds in the tuning console, the UI shows 
 **API:**
 - `POST /api/scoring/preview` — accepts proposed weights + thresholds, returns re-scored results with before/after classifications per user
 
-### Phase 4: Device Investigation (stretch)
+### Phase 5: Device Investigation (stretch)
 
 Drill into a specific user's device for full explainability.
 

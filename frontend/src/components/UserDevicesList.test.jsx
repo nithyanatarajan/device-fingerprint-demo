@@ -6,9 +6,10 @@ import UserDevicesList from './UserDevicesList';
 vi.mock('../services/api', () => ({
   getUsers: vi.fn(),
   getUserDevices: vi.fn(),
+  getDeviceInvestigation: vi.fn(),
 }));
 
-import { getUsers, getUserDevices } from '../services/api';
+import { getUsers, getUserDevices, getDeviceInvestigation } from '../services/api';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -32,8 +33,7 @@ describe('UserDevicesList', () => {
     expect(screen.getByText('1 device(s)')).toBeInTheDocument();
   });
 
-  it('eagerly loads devices for every user; details visible after row click', async () => {
-    const user = userEvent.setup();
+  it('eagerly loads devices for every user', async () => {
     getUsers.mockResolvedValue([{ id: 'u1', name: 'alice', deviceCount: 1 }]);
     getUserDevices.mockResolvedValue([
       {
@@ -48,44 +48,36 @@ describe('UserDevicesList', () => {
 
     render(<UserDevicesList />);
 
-    // Compact row appears without any click — label + score visible
+    // Compact row appears without any click — label visible
     await waitFor(() => {
       expect(screen.getByText('Chrome on Mac')).toBeInTheDocument();
     });
     expect(getUserDevices).toHaveBeenCalledWith('u1');
-
-    // Details (sig, ip, visits, last seen) hidden until row is clicked
-    expect(screen.queryByText(/abcd1234abcd1234/)).not.toBeInTheDocument();
-    await user.click(screen.getByTestId('device-row-button-d1'));
-    await waitFor(() => {
-      expect(screen.getByText(/abcd1234abcd1234/)).toBeInTheDocument();
-    });
-    expect(screen.getByText(/1\.2\.3\.4/)).toBeInTheDocument();
-    expect(screen.getByText(/visits: 5/)).toBeInTheDocument();
   });
 
-  it('shows null sig and ip when missing once details are expanded', async () => {
+  it('clicking a device row opens the investigation modal for that device', async () => {
     const user = userEvent.setup();
     getUsers.mockResolvedValue([{ id: 'u1', name: 'alice', deviceCount: 1 }]);
     getUserDevices.mockResolvedValue([
-      {
-        id: 'd1',
-        label: 'Chrome',
-        machineSignature: null,
-        publicIp: null,
-        lastSeenAt: null,
-        visitCount: 0,
-      },
+      { id: 'd1', label: 'Chrome on Mac', visitCount: 2, machineSignature: 'a', publicIp: 'b' },
     ]);
+    getDeviceInvestigation.mockResolvedValue({
+      deviceId: 'd1',
+      deviceLabel: 'Chrome on Mac',
+      visitCount: 2,
+      visits: [],
+      matchExplanation: null,
+    });
 
     render(<UserDevicesList />);
-    await waitFor(() => expect(screen.getByText('Chrome')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Chrome on Mac')).toBeInTheDocument());
 
     await user.click(screen.getByTestId('device-row-button-d1'));
+
     await waitFor(() => {
-      expect(screen.getByText(/sig: null/)).toBeInTheDocument();
+      expect(getDeviceInvestigation).toHaveBeenCalledWith('u1', 'd1');
     });
-    expect(screen.getByText(/ip: null/)).toBeInTheDocument();
+    expect(screen.getByTestId('investigation-dialog')).toBeInTheDocument();
   });
 
   it('collapses on click after auto-expand', async () => {

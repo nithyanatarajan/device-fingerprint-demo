@@ -5,18 +5,15 @@ import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import Collapse from '@mui/material/Collapse';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import Chip from '@mui/material/Chip';
+import InvestigationDialog from './InvestigationDialog';
 import { getUsers, getUserDevices } from '../services/api';
-
-function formatLastSeen(value) {
-  if (!value) return 'never';
-  return value;
-}
 
 const TRANSITION_BG = {
   PROMOTED: '#e8f5e9',
@@ -84,11 +81,16 @@ function ScoreDisplay({ previewDevice }) {
   );
 }
 
-function DeviceRow({ device, previewDevice }) {
-  const [detailsOpen, setDetailsOpen] = useState(false);
+function DeviceRow({ device, previewDevice, onInvestigate }) {
   const isSingleFingerprint =
     previewDevice?.fingerprintCount != null && previewDevice.fingerprintCount < 2;
   const transition = isSingleFingerprint ? 'UNCHANGED' : previewDevice?.transition || 'UNCHANGED';
+
+  // Tooltip message: tells the user what clicking the row will do, and warns
+  // when there's no comparison available (single-visit device).
+  const tooltipText = isSingleFingerprint
+    ? 'Open investigation — single visit, no comparison yet'
+    : 'Open investigation — see why this device matched';
 
   return (
     <Box
@@ -100,79 +102,47 @@ function DeviceRow({ device, previewDevice }) {
         backgroundColor: TRANSITION_BG[transition],
       }}
     >
-      {/* Compact row — only the must-see fields. Click to expand details
-          (sig, ip, last seen, visits). The click target also doubles as the
-          Phase 4 investigation hook once that lands. */}
-      <Box
-        component="button"
-        type="button"
-        onClick={() => setDetailsOpen((prev) => !prev)}
-        aria-expanded={detailsOpen}
-        aria-controls={`device-details-${device.id}`}
-        data-testid={`device-row-button-${device.id}`}
-        sx={{
-          width: '100%',
-          textAlign: 'left',
-          background: 'transparent',
-          border: 0,
-          cursor: 'pointer',
-          py: 1,
-          px: 2,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 2,
-          flexWrap: 'wrap',
-          '&:hover': { backgroundColor: 'action.hover' },
-        }}
-      >
-        <Typography variant="body2" sx={{ fontWeight: 500, flexShrink: 0 }}>
-          {device.label}
-        </Typography>
-        <ScoreDisplay previewDevice={previewDevice} />
-        {!isSingleFingerprint && previewDevice && previewDevice.transition !== 'UNCHANGED' && (
-          <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', ml: 'auto' }}>
-            <Chip size="small" label={previewDevice.currentClassification} variant="outlined" />
-            <Typography variant="caption">→</Typography>
-            <Chip
-              size="small"
-              label={previewDevice.proposedClassification}
-              color={previewDevice.transition === 'PROMOTED' ? 'success' : 'error'}
-            />
-          </Box>
-        )}
-        <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center' }}>
-          {detailsOpen ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-        </Box>
-      </Box>
-
-      <Collapse in={detailsOpen} timeout="auto" unmountOnExit>
+      {/* Click anywhere on the row to open the Phase 4 investigation modal.
+          Single-fingerprint devices still open the modal — it gracefully shows
+          the lone visit and explains why there's no comparison yet. */}
+      <Tooltip title={tooltipText} placement="top-start" enterDelay={400}>
         <Box
-          id={`device-details-${device.id}`}
-          sx={{ px: 2, pb: 1, display: 'flex', gap: 2, flexWrap: 'wrap' }}
+          component="button"
+          type="button"
+          onClick={() => onInvestigate(device.id, device.label)}
+          data-testid={`device-row-button-${device.id}`}
+          sx={{
+            width: '100%',
+            textAlign: 'left',
+            background: 'transparent',
+            border: 0,
+            cursor: 'pointer',
+            py: 1,
+            px: 2,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            flexWrap: 'wrap',
+            '&:hover': { backgroundColor: 'action.hover' },
+          }}
         >
-          <Typography
-            variant="caption"
-            sx={{
-              fontFamily: 'monospace',
-              color: device.machineSignature ? 'text.primary' : 'text.disabled',
-            }}
-          >
-            sig: {device.machineSignature || 'null'}
+          <Typography variant="body2" sx={{ fontWeight: 500, flexShrink: 0 }}>
+            {device.label}
           </Typography>
-          <Typography
-            variant="caption"
-            sx={{ color: device.publicIp ? 'text.primary' : 'text.disabled' }}
-          >
-            ip: {device.publicIp || 'null'}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            last seen: {formatLastSeen(device.lastSeenAt)}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            visits: {device.visitCount}
-          </Typography>
+          <ScoreDisplay previewDevice={previewDevice} />
+          {!isSingleFingerprint && previewDevice && previewDevice.transition !== 'UNCHANGED' && (
+            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', ml: 'auto' }}>
+              <Chip size="small" label={previewDevice.currentClassification} variant="outlined" />
+              <Typography variant="caption">→</Typography>
+              <Chip
+                size="small"
+                label={previewDevice.proposedClassification}
+                color={previewDevice.transition === 'PROMOTED' ? 'success' : 'error'}
+              />
+            </Box>
+          )}
         </Box>
-      </Collapse>
+      </Tooltip>
     </Box>
   );
 }
@@ -184,6 +154,14 @@ export default function UserDevicesList({ refreshKey = 0, previewByDeviceId = {}
   const [collapsedUserIds, setCollapsedUserIds] = useState(() => new Set());
   const [devicesByUser, setDevicesByUser] = useState({});
   const [deviceError, setDeviceError] = useState({});
+  // Investigation modal state — which (userId, deviceId, deviceLabel) to show.
+  // null when the modal is closed.
+  const [investigationTarget, setInvestigationTarget] = useState(null);
+
+  const openInvestigation = (userId, deviceId, deviceLabel) => {
+    setInvestigationTarget({ userId, deviceId, deviceLabel });
+  };
+  const closeInvestigation = () => setInvestigationTarget(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -248,38 +226,50 @@ export default function UserDevicesList({ refreshKey = 0, previewByDeviceId = {}
   }
 
   return (
-    <List dense>
-      {users.map((user) => {
-        const isOpen = !collapsedUserIds.has(user.id);
-        return (
-          <Box key={user.id} data-testid={`user-section-${user.name}`}>
-            <ListItem disablePadding>
-              <ListItemButton onClick={() => toggle(user.id)}>
-                <ListItemText primary={user.name} secondary={`${user.deviceCount} device(s)`} />
-                {isOpen ? <ExpandLess /> : <ExpandMore />}
-              </ListItemButton>
-            </ListItem>
-            <Collapse in={isOpen} timeout="auto" unmountOnExit>
-              <Box sx={{ pl: 2, pr: 2, pb: 1 }}>
-                {deviceError[user.id] && <Alert severity="error">{deviceError[user.id]}</Alert>}
-                {devicesByUser[user.id] &&
-                  devicesByUser[user.id].map((device) => (
-                    <DeviceRow
-                      key={device.id}
-                      device={device}
-                      previewDevice={previewByDeviceId[device.id]}
-                    />
-                  ))}
-                {devicesByUser[user.id] && devicesByUser[user.id].length === 0 && (
-                  <Typography variant="caption" color="text.secondary">
-                    No devices.
-                  </Typography>
-                )}
-              </Box>
-            </Collapse>
-          </Box>
-        );
-      })}
-    </List>
+    <>
+      <List dense>
+        {users.map((user) => {
+          const isOpen = !collapsedUserIds.has(user.id);
+          return (
+            <Box key={user.id} data-testid={`user-section-${user.name}`}>
+              <ListItem disablePadding>
+                <ListItemButton onClick={() => toggle(user.id)}>
+                  <ListItemText primary={user.name} secondary={`${user.deviceCount} device(s)`} />
+                  {isOpen ? <ExpandLess /> : <ExpandMore />}
+                </ListItemButton>
+              </ListItem>
+              <Collapse in={isOpen} timeout="auto" unmountOnExit>
+                <Box sx={{ pl: 2, pr: 2, pb: 1 }}>
+                  {deviceError[user.id] && <Alert severity="error">{deviceError[user.id]}</Alert>}
+                  {devicesByUser[user.id] &&
+                    devicesByUser[user.id].map((device) => (
+                      <DeviceRow
+                        key={device.id}
+                        device={device}
+                        previewDevice={previewByDeviceId[device.id]}
+                        onInvestigate={(deviceId, deviceLabel) =>
+                          openInvestigation(user.id, deviceId, deviceLabel)
+                        }
+                      />
+                    ))}
+                  {devicesByUser[user.id] && devicesByUser[user.id].length === 0 && (
+                    <Typography variant="caption" color="text.secondary">
+                      No devices.
+                    </Typography>
+                  )}
+                </Box>
+              </Collapse>
+            </Box>
+          );
+        })}
+      </List>
+      <InvestigationDialog
+        open={investigationTarget !== null}
+        userId={investigationTarget?.userId}
+        deviceId={investigationTarget?.deviceId}
+        deviceLabel={investigationTarget?.deviceLabel}
+        onClose={closeInvestigation}
+      />
+    </>
   );
 }

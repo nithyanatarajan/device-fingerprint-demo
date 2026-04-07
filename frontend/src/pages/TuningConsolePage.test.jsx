@@ -17,6 +17,7 @@ vi.mock('../services/api', () => ({
   clearSeedData: vi.fn(),
   seedScenario: vi.fn(),
   previewScoring: vi.fn(),
+  getDeviceInvestigation: vi.fn(),
 }));
 
 import { getScoringWeights, getScoringConfig, previewScoring } from '../services/api';

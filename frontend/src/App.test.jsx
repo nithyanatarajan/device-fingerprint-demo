@@ -22,6 +22,7 @@ vi.mock('./services/api', () => ({
   getSeedSummary: vi.fn().mockResolvedValue({ users: 0, devices: 0, fingerprints: 0 }),
   clearSeedData: vi.fn(),
   seedScenario: vi.fn(),
+  getDeviceInvestigation: vi.fn(),
 }));
 
 describe('App', () => {

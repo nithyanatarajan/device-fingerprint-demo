@@ -84,3 +84,7 @@ export function resetScoringConfig() {
 export function seedScenario() {
   return request('/api/admin/seed/scenario', { method: 'POST' });
 }
+
+export function getDeviceInvestigation(userId, deviceId) {
+  return request(`/api/users/${userId}/devices/${deviceId}/investigation`);
+}

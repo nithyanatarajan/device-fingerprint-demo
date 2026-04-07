@@ -14,6 +14,7 @@ import {
   resetScoringWeights,
   resetScoringConfig,
   seedScenario,
+  getDeviceInvestigation,
 } from './api';
 
 const mockFetch = vi.fn();
@@ -215,6 +216,15 @@ describe('api service', () => {
     await seedScenario();
     expect(mockFetch).toHaveBeenCalledWith('/api/admin/seed/scenario', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
+  it('getDeviceInvestigation fetches the per-device investigation endpoint', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ deviceId: 'd1', visits: [] }));
+
+    await getDeviceInvestigation('u1', 'd1');
+    expect(mockFetch).toHaveBeenCalledWith('/api/users/u1/devices/d1/investigation', {
       headers: { 'Content-Type': 'application/json' },
     });
   });

@@ -203,8 +203,7 @@ A second identity axis on top of Phase 1. Phase 1 matches per-browser fingerprin
 
 **Demo moment this enables:** "Enter your name in Chrome, then switch to Firefox and enter a different name. The system registers a new user — but also tells you: *this machine was also used by your previous name*. Hardware doesn't lie."
 
-**Signals used (hardware only, browser-independent):**
-- `timezone`
+**Hardware signature (6 signals, browser-independent, OS-update-independent):**
 - `platform`
 - `screenResolution`
 - `colorDepth`
@@ -212,25 +211,48 @@ A second identity axis on top of Phase 1. Phase 1 matches per-browser fingerprin
 - `deviceMemory`
 - `touchSupport`
 
-Browser-specific signals (canvas, webgl, userAgent, codecs) are deliberately **excluded** from the hash so the signature is stable across browsers on the same machine.
+Browser-specific signals (canvas, webgl, userAgent, codecs) are deliberately **excluded** — they change per browser. `timezone` is also **excluded** from the hash because it is an OS setting that changes when the user travels or on DST transitions; including it would break machine recognition when someone flies across timezones on the same laptop.
+
+**Context signals (used as match gates and UI tags, not in the hash):**
+- `timezone` — hard co-match gate (see matching rules below)
+- `locale` — hard co-match gate
+- `publicIp` — soft, surfaced as a tag
 
 **Design:**
-- **Exact-match SHA-256 hash** over the hardware signals in canonical order. Stored as a column on `DeviceFingerprint`. Swappable to fuzzy matching later as an internal refactor.
-- **Public IP as a hard co-match requirement**, not a confidence modifier. Captured from the HTTP request (`X-Forwarded-For` → `RemoteAddr`). Match query requires both `machineSignature` AND `publicIp` to match. Two identical machines on different networks never collide — false negatives preferred over false positives for credibility.
-- **No VPN detection, no IP geolocation, no ASN lookup.** The product only claims what it can prove. If the network differs, no match is shown; we do not guess between "moved to café" and "VPN enabled".
+- **Exact-match SHA-256 hash** over the 6 hardware signals in canonical order. Stored as a column on `DeviceFingerprint`. Swappable to fuzzy matching later as an internal refactor of `MachineSignatureService`.
+- **Tiered matching** — the product never makes a claim it cannot defend:
+  - **Strong match** ("Same machine"): hardware signature **AND** `timezone` **AND** `locale` **AND** `publicIp` all match. Near-zero false positives outside the household-collision edge case.
+  - **Possible match** ("Matching hardware"): hardware signature **AND** `timezone` **AND** `locale` match, but `publicIp` differs. Captures the "same machine on a different network" scenarios (VPN, café, mobile hotspot, roamed to a new Wi-Fi) without dropping them silently. Clearly caveated in the UI — the system does not claim these *are* the same machine, only that the hardware profile matches.
+  - **Hidden**: anything else. Hardware match without timezone match, or without locale match, is suppressed. Different hardware is suppressed regardless.
+- **No VPN detection, no IP geolocation, no ASN lookup.** The product only claims what it can prove.
 - **Cross-user matching is intentional.** Same-user matches are also included for consistency.
 - **Self-matches excluded** (the current device's own prior fingerprints don't appear in its own panel).
+- **Stored columns, not computed on-the-fly.** `machineSignature` and `publicIp` are persisted on `DeviceFingerprint` for fast indexed lookup; `timezone` and `locale` are already persisted from Phase 1.
+
+**Why two tiers, not a single confidence score:** A score would blur the line between "I can prove this" and "I can only suggest this". The tiers make the distinction visible and non-negotiable — the audience can read either heading and know exactly what's being claimed.
 
 **APIs:**
-- `POST /api/collect` response extended with a non-breaking `machineMatch` field: `{ matches: [{ userId, userName, deviceId, deviceLabel, lastSeenAt }] }`. Empty list when no match.
+- `POST /api/collect` response extended with a `machineMatch` field:
+  ```
+  {
+    "strongMatches":   [{ userId, userName, deviceId, deviceLabel, lastSeenAt }],
+    "possibleMatches": [{ userId, userName, deviceId, deviceLabel, lastSeenAt }]
+  }
+  ```
+  Both lists are always present; either may be empty.
 
 **Frontend:**
-- New `Same Machine` panel below the existing match result on the collection page
-- Hidden entirely when `matches` is empty — no empty-state card
-- No confidence chip, no "same network" tag — the presence of the match is the signal
-- Small footer caveat: *"Based on device hardware and network. Identical machines on the same network may appear as one."*
+- A **Same Machine** panel below the per-device match result. Two sections rendered conditionally:
+  - **Strong section** ("Same machine") — rendered when `strongMatches` is non-empty. Primary styling (filled Paper, normal emphasis).
+  - **Possible section** ("Matching hardware") — rendered when `possibleMatches` is non-empty. Secondary styling (outlined Paper, warning-muted accent), with an inline caveat: *"Same device profile from a different network. Could be the same machine on a different Wi-Fi or VPN, or an unrelated machine with identical hardware."*
+- The panel is entirely hidden when both lists are empty.
+- Each row: `<deviceLabel> · <userName>` with relative last-seen time.
+- A small footer caveat documents the household-collision limitation.
 
-**Known limitation (documented in the UI):** Two identical hardware configurations on the same Wi-Fi produce a false positive. This is an intrinsic limit of device-level fingerprinting with browser-accessible signals — resolving it requires higher-entropy inputs (mouse dynamics, keystroke timing) which belong to a later phase, if at all.
+**Known limitations (documented in the UI):**
+1. **Household hardware collision:** two identical machines on the same Wi-Fi produce both a strong and a possible match false positive. This is the fundamental limit of device-level fingerprinting with browser-accessible signals and cannot be resolved without higher-entropy inputs (mouse dynamics, keystroke timing) which belong to a later phase.
+2. **Urban hardware collision:** in homogeneous populations (e.g., many MacBook Pro users in the same city with the same OS locale), the "Matching hardware" section can surface unrelated machines. The explicit caveat on that section makes the uncertainty clear — the product acknowledges this rather than hides it.
+3. **Traveling across timezones:** a user flying with the same laptop from one timezone to another will not be recognized until they re-register under the new timezone. This is conservative by design — preferring a missed match over a false positive.
 
 ### Phase 3: Scoring Engine + Tuning Console
 

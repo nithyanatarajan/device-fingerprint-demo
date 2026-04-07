@@ -28,7 +28,17 @@ cd backend
 ./gradlew bootRun
 ```
 
-Backend runs on `http://localhost:8080`.
+Backend runs on `http://localhost:8080`. Default datasource is in-memory H2 — every restart wipes the data.
+
+**Persistent mode** (data survives backend restarts) — opt in via env vars:
+
+```bash
+DATABASE_URL='jdbc:h2:file:./data/deviceid;AUTO_SERVER=TRUE' \
+DDL_AUTO=update \
+./gradlew bootRun
+```
+
+This writes to `backend/data/deviceid.mv.db` (gitignored) and migrates the schema additively across restarts. `AUTO_SERVER=TRUE` allows multiple JVMs to share the file, so tests don't deadlock if you run them while a `bootRun` is up. Use this when preparing a demo so seeded data and test runs survive.
 
 ### Frontend
 
@@ -129,6 +139,8 @@ On failure, the config automatically captures: trace (timeline + DOM snapshots +
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `SERVER_PORT` | `8080` | Backend server port |
+| `DATABASE_URL` | `jdbc:h2:mem:deviceid` | Backend JDBC URL. Set to `jdbc:h2:file:./data/deviceid;AUTO_SERVER=TRUE` (combined with `DDL_AUTO=update`) for persistent demo prep mode. |
+| `DDL_AUTO` | `create-drop` | Hibernate schema management mode. Use `update` with file-mode `DATABASE_URL` to preserve data across backend restarts. |
 | `SEED_DATA` | `false` | Enable synthetic data seeding |
 | `VITE_API_URL` | `http://localhost:8080` | Backend URL for frontend proxy |
 | `VITE_PORT` | `5173` | Frontend dev server port |

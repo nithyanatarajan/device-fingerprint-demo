@@ -7,9 +7,10 @@ import ThresholdSliders from './ThresholdSliders';
 vi.mock('../services/api', () => ({
   getScoringConfig: vi.fn(),
   updateScoringConfig: vi.fn(),
+  resetScoringConfig: vi.fn(),
 }));
 
-import { getScoringConfig, updateScoringConfig } from '../services/api';
+import { getScoringConfig, updateScoringConfig, resetScoringConfig } from '../services/api';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -91,11 +92,54 @@ describe('ThresholdSliders', () => {
     });
   });
 
+  it('reset calls POST /config/reset and applies the canonical defaults without unmounting sliders', async () => {
+    const user = userEvent.setup();
+    // Server starts with polluted thresholds
+    getScoringConfig.mockResolvedValue({ sameDeviceThreshold: 33, driftThreshold: 22 });
+    resetScoringConfig.mockResolvedValue({ sameDeviceThreshold: 85, driftThreshold: 60 });
+
+    render(<ThresholdSliders />);
+    await waitFor(() => {
+      expect(screen.getByText('Same-device threshold')).toBeInTheDocument();
+    });
+    expect(screen.getByText('33')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Reset to defaults' }));
+
+    await waitFor(() => {
+      expect(resetScoringConfig).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(screen.getByText('85')).toBeInTheDocument();
+    });
+    expect(screen.getByText('60')).toBeInTheDocument();
+    // Sliders stay mounted throughout reset
+    expect(screen.getByLabelText('same-device threshold')).toBeInTheDocument();
+    expect(screen.getByLabelText('drift threshold')).toBeInTheDocument();
+  });
+
   it('shows error when fetch fails', async () => {
     getScoringConfig.mockRejectedValue(new Error('config fail'));
     render(<ThresholdSliders />);
     await waitFor(() => {
       expect(screen.getByText('config fail')).toBeInTheDocument();
+    });
+  });
+
+  it('shows error when reset fails', async () => {
+    const user = userEvent.setup();
+    getScoringConfig.mockResolvedValue({ sameDeviceThreshold: 33, driftThreshold: 22 });
+    resetScoringConfig.mockRejectedValue(new Error('reset boom'));
+
+    render(<ThresholdSliders />);
+    await waitFor(() => {
+      expect(screen.getByText('Same-device threshold')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Reset to defaults' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('reset boom')).toBeInTheDocument();
     });
   });
 });

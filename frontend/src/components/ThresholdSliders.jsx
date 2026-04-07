@@ -6,12 +6,13 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
-import { getScoringConfig, updateScoringConfig } from '../services/api';
+import { getScoringConfig, resetScoringConfig, updateScoringConfig } from '../services/api';
 
 export default function ThresholdSliders({ onChange }) {
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -53,6 +54,22 @@ export default function ThresholdSliders({ onChange }) {
       setError(err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Same loader-aware reset pattern as WeightSliders — never toggles the
+  // global loading flag, so the sliders stay mounted while resetting.
+  const handleReset = async () => {
+    setResetting(true);
+    setError(null);
+    try {
+      const fresh = await resetScoringConfig();
+      setConfig(fresh);
+      if (onChange) onChange(fresh);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -103,7 +120,10 @@ export default function ThresholdSliders({ onChange }) {
         </Box>
       </Stack>
       <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
-        <Button variant="contained" onClick={handleSave} disabled={saving}>
+        <Button variant="outlined" onClick={handleReset} disabled={saving || resetting}>
+          {resetting ? <CircularProgress size={20} /> : 'Reset to defaults'}
+        </Button>
+        <Button variant="contained" onClick={handleSave} disabled={saving || resetting}>
           {saving ? <CircularProgress size={20} /> : 'Save thresholds'}
         </Button>
       </Stack>

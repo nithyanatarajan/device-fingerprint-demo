@@ -40,6 +40,23 @@ function ScoreDisplay({ previewDevice }) {
     );
   }
 
+  // Single-fingerprint devices have nothing to score against (the preview
+  // service compares latest vs second-latest visit). Show an explicit
+  // "no history yet" hint instead of a misleading "score: 0.0", which
+  // looked like a bug to people watching the demo.
+  if (previewDevice.fingerprintCount != null && previewDevice.fingerprintCount < 2) {
+    return (
+      <Typography
+        variant="caption"
+        color="text.disabled"
+        sx={{ fontStyle: 'italic' }}
+        data-testid="device-score"
+      >
+        single visit — no history to score yet
+      </Typography>
+    );
+  }
+
   const { currentScore, proposedScore, transition } = previewDevice;
   const moved = Math.abs((proposedScore ?? 0) - (currentScore ?? 0)) >= 0.05;
 
@@ -74,7 +91,11 @@ function ScoreDisplay({ previewDevice }) {
 }
 
 function DeviceRow({ device, previewDevice }) {
-  const transition = previewDevice?.transition || 'UNCHANGED';
+  const isSingleFingerprint =
+    previewDevice?.fingerprintCount != null && previewDevice.fingerprintCount < 2;
+  // Single-fingerprint devices never get highlighted because their transition
+  // is always degenerate (NEW_DEVICE → NEW_DEVICE).
+  const transition = isSingleFingerprint ? 'UNCHANGED' : previewDevice?.transition || 'UNCHANGED';
   return (
     <Box
       data-testid={`device-row-${device.id}`}
@@ -114,7 +135,7 @@ function DeviceRow({ device, previewDevice }) {
           visits: {device.visitCount}
         </Typography>
       </Box>
-      {previewDevice && previewDevice.transition !== 'UNCHANGED' && (
+      {!isSingleFingerprint && previewDevice && previewDevice.transition !== 'UNCHANGED' && (
         <Box sx={{ display: 'flex', gap: 1, mt: 0.5, alignItems: 'center' }}>
           <Chip size="small" label={previewDevice.currentClassification} variant="outlined" />
           <Typography variant="caption">→</Typography>

@@ -216,6 +216,32 @@ describe('UserDevicesList', () => {
     expect(score).toHaveTextContent('-48.1');
   });
 
+  it('shows "single visit — no history" hint for single-fingerprint devices and skips highlighting', async () => {
+    getUsers.mockResolvedValue([{ id: 'u1', name: 'alice', deviceCount: 1 }]);
+    getUserDevices.mockResolvedValue([
+      { id: 'd1', label: 'Chrome', visitCount: 1, machineSignature: 'a', publicIp: 'b' },
+    ]);
+    const previewByDeviceId = {
+      d1: {
+        deviceId: 'd1',
+        fingerprintCount: 1,
+        currentClassification: 'NEW_DEVICE',
+        proposedClassification: 'NEW_DEVICE',
+        currentScore: 0,
+        proposedScore: 0,
+        // even if a transition somehow leaks through, we should ignore it
+        transition: 'PROMOTED',
+      },
+    };
+
+    render(<UserDevicesList previewByDeviceId={previewByDeviceId} />);
+    await waitFor(() => expect(screen.getByText('Chrome')).toBeInTheDocument());
+
+    expect(screen.getByTestId('device-score')).toHaveTextContent(/single visit/);
+    // Row stays UNCHANGED regardless of preview transition for single-fp devices
+    expect(screen.getByTestId('device-row-d1')).toHaveAttribute('data-transition', 'UNCHANGED');
+  });
+
   it('shows per-user device-fetch error', async () => {
     getUsers.mockResolvedValue([{ id: 'u1', name: 'alice', deviceCount: 1 }]);
     getUserDevices.mockRejectedValue(new Error('device boom'));

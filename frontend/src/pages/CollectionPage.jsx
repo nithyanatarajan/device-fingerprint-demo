@@ -7,6 +7,7 @@ import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import SignalBreakdown from '../components/SignalBreakdown';
+import SameMachinePanel from '../components/SameMachinePanel';
 import { collectFingerprint } from '../services/api';
 import { collectSignals, FingerprintBlockedError } from '../services/fingerprint';
 
@@ -102,6 +103,8 @@ export default function CollectionPage() {
           )}
         </Box>
       )}
+
+      {result && <SameMachinePanel matches={result?.machineMatch?.matches} />}
 
       {signals && <SignalBreakdown signals={signals} changedSignals={result?.changedSignals} />}
     </Box>

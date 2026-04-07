@@ -127,6 +127,84 @@ describe('CollectionPage', () => {
     });
   });
 
+  it('renders Same Machine panel when machineMatch.matches is non-empty', async () => {
+    const user = userEvent.setup();
+    collectSignals.mockResolvedValue({ platform: 'MacIntel' });
+    collectFingerprint.mockResolvedValue({
+      userId: 'u1',
+      deviceId: 'd1',
+      deviceLabel: 'Firefox',
+      matchResult: 'NEW_DEVICE',
+      score: 0,
+      changedSignals: [],
+      machineMatch: {
+        matches: [
+          {
+            userId: 'u2',
+            userName: 'userA',
+            deviceId: 'd2',
+            deviceLabel: 'Chrome on MacOS',
+            lastSeenAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+          },
+        ],
+      },
+    });
+
+    render(<CollectionPage />);
+    await user.type(screen.getByLabelText('Enter your name'), 'testuser');
+    await user.click(screen.getByRole('button', { name: 'Identify' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Same machine' })).toBeInTheDocument();
+    });
+    expect(screen.getByText('Chrome on MacOS \u00B7 userA')).toBeInTheDocument();
+  });
+
+  it('does not render Same Machine panel when machineMatch.matches is empty', async () => {
+    const user = userEvent.setup();
+    collectSignals.mockResolvedValue({ platform: 'MacIntel' });
+    collectFingerprint.mockResolvedValue({
+      userId: 'u1',
+      deviceId: 'd1',
+      deviceLabel: 'Firefox',
+      matchResult: 'NEW_DEVICE',
+      score: 0,
+      changedSignals: [],
+      machineMatch: { matches: [] },
+    });
+
+    render(<CollectionPage />);
+    await user.type(screen.getByLabelText('Enter your name'), 'testuser');
+    await user.click(screen.getByRole('button', { name: 'Identify' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('NEW_DEVICE')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('heading', { name: 'Same machine' })).not.toBeInTheDocument();
+  });
+
+  it('does not render Same Machine panel when machineMatch is missing', async () => {
+    const user = userEvent.setup();
+    collectSignals.mockResolvedValue({ platform: 'MacIntel' });
+    collectFingerprint.mockResolvedValue({
+      userId: 'u1',
+      deviceId: 'd1',
+      deviceLabel: 'Firefox',
+      matchResult: 'NEW_DEVICE',
+      score: 0,
+      changedSignals: [],
+    });
+
+    render(<CollectionPage />);
+    await user.type(screen.getByLabelText('Enter your name'), 'testuser');
+    await user.click(screen.getByRole('button', { name: 'Identify' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('NEW_DEVICE')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('heading', { name: 'Same machine' })).not.toBeInTheDocument();
+  });
+
   it('shows specific message when FingerprintJS is blocked by privacy extension', async () => {
     const user = userEvent.setup();
     collectSignals.mockRejectedValue(new FingerprintBlockedError());

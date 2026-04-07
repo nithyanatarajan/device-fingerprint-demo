@@ -55,3 +55,20 @@ export function previewScoring(proposedConfig) {
     body: JSON.stringify(proposedConfig),
   });
 }
+
+export function seedDemoUser(payload) {
+  return request('/api/admin/seed', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getSeedSummary() {
+  return request('/api/admin/seed/summary');
+}
+
+export function clearSeedData() {
+  return request('/api/admin/seed', {
+    method: 'DELETE',
+  });
+}

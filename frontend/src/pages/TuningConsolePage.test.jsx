@@ -9,6 +9,9 @@ vi.mock('../services/api', () => ({
   updateScoringConfig: vi.fn(),
   getUsers: vi.fn().mockResolvedValue([]),
   getUserDevices: vi.fn().mockResolvedValue([]),
+  seedDemoUser: vi.fn(),
+  getSeedSummary: vi.fn().mockResolvedValue({ users: 0, devices: 0, fingerprints: 0 }),
+  clearSeedData: vi.fn(),
 }));
 
 describe('TuningConsolePage', () => {

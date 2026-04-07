@@ -8,6 +8,9 @@ import {
   getScoringConfig,
   updateScoringConfig,
   previewScoring,
+  seedDemoUser,
+  getSeedSummary,
+  clearSeedData,
 } from './api';
 
 const mockFetch = vi.fn();
@@ -141,6 +144,45 @@ describe('api service', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(proposed),
+    });
+  });
+
+  it('seedDemoUser posts to /api/admin/seed', async () => {
+    const payload = {
+      userName: 'demo-user-alpha',
+      browser: 'chrome',
+      vpn: false,
+      incognito: false,
+    };
+    mockFetch.mockResolvedValueOnce(jsonResponse({ userId: '1' }));
+
+    await seedDemoUser(payload);
+
+    expect(mockFetch).toHaveBeenCalledWith('/api/admin/seed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  });
+
+  it('getSeedSummary fetches /api/admin/seed/summary', async () => {
+    const summary = { users: 2, devices: 4, fingerprints: 10 };
+    mockFetch.mockResolvedValueOnce(jsonResponse(summary));
+
+    const result = await getSeedSummary();
+    expect(mockFetch).toHaveBeenCalledWith('/api/admin/seed/summary', {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    expect(result).toEqual(summary);
+  });
+
+  it('clearSeedData deletes /api/admin/seed', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ users: 1, devices: 1, fingerprints: 1 }));
+
+    await clearSeedData();
+    expect(mockFetch).toHaveBeenCalledWith('/api/admin/seed', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
     });
   });
 });

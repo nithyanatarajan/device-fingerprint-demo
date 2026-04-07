@@ -57,7 +57,7 @@ function DeviceRow({ device }) {
   );
 }
 
-export default function UserDevicesList() {
+export default function UserDevicesList({ refreshKey = 0 }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -72,7 +72,7 @@ export default function UserDevicesList() {
       .then((data) => setUsers(data))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshKey]);
 
   const toggle = async (userId) => {
     if (expandedUserId === userId) {

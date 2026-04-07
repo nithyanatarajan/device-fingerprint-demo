@@ -7,6 +7,8 @@ vi.mock('../services/api', () => ({
   updateScoringWeights: vi.fn(),
   getScoringConfig: vi.fn().mockResolvedValue({ sameDeviceThreshold: 85, driftThreshold: 60 }),
   updateScoringConfig: vi.fn(),
+  getUsers: vi.fn().mockResolvedValue([]),
+  getUserDevices: vi.fn().mockResolvedValue([]),
 }));
 
 describe('TuningConsolePage', () => {

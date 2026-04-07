@@ -13,12 +13,15 @@ vi.mock('./services/api', () => ({
   getUserDevices: vi.fn().mockResolvedValue([]),
   getScoringWeights: vi.fn().mockResolvedValue({}),
   updateScoringWeights: vi.fn(),
+  resetScoringWeights: vi.fn(),
   getScoringConfig: vi.fn().mockResolvedValue({ sameDeviceThreshold: 85, driftThreshold: 60 }),
   updateScoringConfig: vi.fn(),
+  resetScoringConfig: vi.fn(),
   previewScoring: vi.fn().mockResolvedValue({ users: [], summary: {} }),
   seedDemoUser: vi.fn(),
   getSeedSummary: vi.fn().mockResolvedValue({ users: 0, devices: 0, fingerprints: 0 }),
   clearSeedData: vi.fn(),
+  seedScenario: vi.fn(),
 }));
 
 describe('App', () => {
@@ -44,5 +47,28 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Tuning Console' }));
 
     expect(screen.getByRole('heading', { name: 'Tuning Console', level: 4 })).toBeInTheDocument();
+  });
+
+  it('marks the active navbar tab via data-active', async () => {
+    const user = userEvent.setup();
+    // BrowserRouter shares window.history across tests in this file, so
+    // explicitly reset to / before asserting initial state.
+    window.history.pushState({}, '', '/');
+    render(<App />);
+
+    // On /, Collect should be marked active
+    expect(screen.getByRole('button', { name: 'Collect' })).toHaveAttribute('data-active', 'true');
+    expect(screen.getByRole('button', { name: 'Tuning Console' })).toHaveAttribute(
+      'data-active',
+      'false',
+    );
+
+    // After navigating, Tuning Console should be active
+    await user.click(screen.getByRole('button', { name: 'Tuning Console' }));
+    expect(screen.getByRole('button', { name: 'Tuning Console' })).toHaveAttribute(
+      'data-active',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Collect' })).toHaveAttribute('data-active', 'false');
   });
 });

@@ -9,7 +9,25 @@ import org.springframework.stereotype.Component;
 /**
  * Computes a stable, browser-independent machine signature over hardware-only signals.
  *
- * <p>The hash spans 4 hardware signals: platform, screenResolution, pixelRatio, touchSupport.
+ * <p>The hash spans 5 hardware-and-font signals: platform, screenResolution, pixelRatio,
+ * touchSupport, fontHash.
+ *
+ * <p><b>Why fontHash is included.</b> The first four signals are hardware properties shared by
+ * every machine of a given model — two MacBook Pros of the same SKU collide on all of them. The
+ * font hash breaks that tie. It is a digest the frontend computes by probing a curated list of font
+ * names with {@code document.fonts.check()} and hashing the resulting bit vector. Three properties
+ * make it suitable for the hash:
+ *
+ * <ul>
+ *   <li><b>Cross-browser stable.</b> {@code document.fonts.check()} returns the same boolean for a
+ *       given font name in Chrome, Firefox, and Safari on the same OS, because all three resolve
+ *       against the system font registry rather than a browser-managed list.
+ *   <li><b>High entropy within a user.</b> Two physically identical machines owned by the same user
+ *       almost always diverge on installed fonts: one has Adobe Creative Cloud, the other has
+ *       Office, the third has nothing extra. Installed software pulls in distinct font families.
+ *   <li><b>Cheap.</b> ~150 boolean checks at page load on the frontend, sub-millisecond. The
+ *       backend just stores the hex string and concatenates it into the signature.
+ * </ul>
  *
  * <p>Signals deliberately excluded from the hash, with reasons:
  *
@@ -34,10 +52,12 @@ import org.springframework.stereotype.Component;
  * would silently break cross-browser machine recognition — the very property the hash exists to
  * provide.
  *
- * <p>The trade-off is reduced entropy. With 4 signals the global combination space is small (~1,500
- * buckets), but per-user scoping in {@code MachineMatchService} contains the collision risk:
- * matches are only computed against the current user's own devices (typically 1–3), not the global
- * population.
+ * <p>The trade-off is reduced entropy. With the four hardware-only signals the global combination
+ * space was small (~1,500 buckets); adding fontHash brings it to roughly 2 million to 80 million
+ * combinations, large enough that within-user collisions between two physically distinct devices
+ * become rare. Per-user scoping in {@code MachineMatchService} contains any residual collision
+ * risk: matches are only computed against the current user's own devices (typically 1–3), not the
+ * global population. The full FP-reduction rationale is documented in {@code docs/how-it-works.md}.
  */
 @Component
 public class MachineSignatureService {
@@ -48,7 +68,8 @@ public class MachineSignatureService {
     sb.append(serialize(fp.getPlatform())).append('|');
     sb.append(serialize(fp.getScreenResolution())).append('|');
     sb.append(serialize(fp.getPixelRatio())).append('|');
-    sb.append(serialize(fp.getTouchSupport()));
+    sb.append(serialize(fp.getTouchSupport())).append('|');
+    sb.append(serialize(fp.getFontHash()));
 
     try {
       MessageDigest digest = MessageDigest.getInstance("SHA-256");

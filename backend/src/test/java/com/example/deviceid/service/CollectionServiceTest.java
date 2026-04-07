@@ -2,9 +2,15 @@ package com.example.deviceid.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.deviceid.domain.Device;
+import com.example.deviceid.domain.DeviceFingerprint;
 import com.example.deviceid.domain.MatchResult;
 import com.example.deviceid.dto.CollectRequest;
 import com.example.deviceid.dto.CollectResponse;
+import com.example.deviceid.repository.DeviceFingerprintRepository;
+import com.example.deviceid.repository.DeviceRepository;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 class CollectionServiceTest {
 
   @Autowired private CollectionService collectionService;
+  @Autowired private DeviceRepository deviceRepository;
+  @Autowired private DeviceFingerprintRepository fingerprintRepository;
 
   @Test
   void firstVisitShouldCreateUserAndDevice() {
@@ -100,6 +108,18 @@ class CollectionServiceTest {
   }
 
   @Test
+  void collectShouldPersistFontHashOnFingerprint() {
+    CollectResponse response = collectionService.collect(createRequest("testuser"), "203.0.113.10");
+
+    UUID deviceId = response.deviceId();
+    Device device = deviceRepository.findById(deviceId).orElseThrow();
+    List<DeviceFingerprint> fps = fingerprintRepository.findByDeviceOrderByCollectedAtDesc(device);
+
+    assertThat(fps).isNotEmpty();
+    assertThat(fps.get(0).getFontHash()).isEqualTo("font-hash-sample");
+  }
+
+  @Test
   void returnVisitWithChangedSignalsShouldReportChanges() {
     collectionService.collect(createRequest("testuser"), "203.0.113.10");
 
@@ -120,7 +140,8 @@ class CollectionServiceTest {
             0,
             "video/webm,video/mp4,audio/ogg",
             false,
-            true);
+            true,
+            "font-hash-sample");
 
     CollectResponse response = collectionService.collect(modified, "203.0.113.10");
 
@@ -146,7 +167,8 @@ class CollectionServiceTest {
         0,
         "video/webm,video/mp4,audio/ogg",
         false,
-        true);
+        true,
+        "font-hash-sample");
   }
 
   private CollectRequest createDifferentDeviceRequest(String name) {
@@ -166,6 +188,7 @@ class CollectionServiceTest {
         5,
         "audio/wav,audio/flac",
         true,
-        false);
+        false,
+        "different-font-hash");
   }
 }

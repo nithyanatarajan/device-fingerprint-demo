@@ -159,6 +159,7 @@ public class CollectionService {
     fp.setCodecSupport(request.codecSupport());
     fp.setDntEnabled(request.dntEnabled());
     fp.setCookieEnabled(request.cookieEnabled());
+    fp.setFontHash(request.fontHash());
     return fp;
   }
 

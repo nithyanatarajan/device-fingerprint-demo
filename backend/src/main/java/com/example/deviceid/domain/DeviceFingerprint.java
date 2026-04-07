@@ -57,6 +57,9 @@ public class DeviceFingerprint {
   private Boolean dntEnabled;
   private Boolean cookieEnabled;
 
+  @Column(length = 256)
+  private String fontHash;
+
   @Column(length = 64)
   private String machineSignature;
 
@@ -214,6 +217,14 @@ public class DeviceFingerprint {
 
   public void setCookieEnabled(Boolean cookieEnabled) {
     this.cookieEnabled = cookieEnabled;
+  }
+
+  public String getFontHash() {
+    return fontHash;
+  }
+
+  public void setFontHash(String fontHash) {
+    this.fontHash = fontHash;
   }
 
   public String getMachineSignature() {

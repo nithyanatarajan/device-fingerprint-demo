@@ -17,4 +17,5 @@ public record CollectRequest(
     Integer touchSupport,
     String codecSupport,
     Boolean dntEnabled,
-    Boolean cookieEnabled) {}
+    Boolean cookieEnabled,
+    String fontHash) {}

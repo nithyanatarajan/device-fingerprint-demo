@@ -114,6 +114,7 @@ class MachineSignatureServiceTest {
     chrome.setUserAgent("Mozilla/5.0 ... Chrome/146");
     chrome.setLocale("en-GB");
     chrome.setTimezone("Asia/Calcutta");
+    chrome.setFontHash("abc123def");
 
     DeviceFingerprint firefox = realWorldBaseline();
     firefox.setCanvasHash("bjom3h");
@@ -124,6 +125,7 @@ class MachineSignatureServiceTest {
     firefox.setUserAgent("Mozilla/5.0 ... Firefox/151");
     firefox.setLocale("en-US");
     firefox.setTimezone("Asia/Kolkata");
+    firefox.setFontHash("abc123def");
 
     DeviceFingerprint safari = realWorldBaseline();
     safari.setCanvasHash("mg0lca");
@@ -134,6 +136,7 @@ class MachineSignatureServiceTest {
     safari.setUserAgent("Mozilla/5.0 ... Safari/26.3.1");
     safari.setLocale("en-IN");
     safari.setTimezone("Asia/Calcutta");
+    safari.setFontHash("abc123def");
 
     String chromeHash = service.computeSignature(chrome);
     String firefoxHash = service.computeSignature(firefox);
@@ -144,7 +147,7 @@ class MachineSignatureServiceTest {
   }
 
   private DeviceFingerprint realWorldBaseline() {
-    User user = new User("nithya");
+    User user = new User("testuser");
     Device device = new Device(user, "Real Device");
     DeviceFingerprint fp = new DeviceFingerprint(device);
     fp.setPlatform("MacIntel");
@@ -210,6 +213,26 @@ class MachineSignatureServiceTest {
     fp.setPixelRatio(2.0);
     fp.setDntEnabled(false);
     fp.setCookieEnabled(true);
+    fp.setFontHash("font-hash-sample");
     return fp;
+  }
+
+  @Test
+  void fontHashAffectsHash() {
+    DeviceFingerprint a = sampleFingerprint();
+    DeviceFingerprint b = sampleFingerprint();
+    b.setFontHash("a-totally-different-font-hash");
+
+    assertThat(service.computeSignature(a)).isNotEqualTo(service.computeSignature(b));
+  }
+
+  @Test
+  void sameFontHashProducesSameHash() {
+    DeviceFingerprint a = sampleFingerprint();
+    DeviceFingerprint b = sampleFingerprint();
+    a.setFontHash("identical-font-hash");
+    b.setFontHash("identical-font-hash");
+
+    assertThat(service.computeSignature(a)).isEqualTo(service.computeSignature(b));
   }
 }

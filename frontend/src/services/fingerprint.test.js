@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { collectSignals, FingerprintBlockedError, __test__ } from './fingerprint';
 
-const { buildSignals, hashString } = __test__;
+const { buildSignals, hashString, getFontHash } = __test__;
 
 vi.mock('@fingerprintjs/fingerprintjs', () => {
   const mockGet = vi.fn();
@@ -101,7 +101,7 @@ describe('buildSignals', () => {
     expect(buildSignals({}).screenResolution).toBe('1920x1080');
   });
 
-  it('returns object with all 15 expected keys', () => {
+  it('returns object with all 16 expected keys', () => {
     const expectedKeys = [
       'canvasHash',
       'webglRenderer',
@@ -118,6 +118,7 @@ describe('buildSignals', () => {
       'codecSupport',
       'dntEnabled',
       'cookieEnabled',
+      'fontHash',
     ];
     const signals = buildSignals({});
     for (const key of expectedKeys) {
@@ -178,6 +179,7 @@ describe('buildSignals', () => {
       codecSupport: 'string',
       dntEnabled: 'boolean',
       cookieEnabled: 'boolean',
+      fontHash: 'string',
     };
 
     for (const [field, expectedType] of Object.entries(expected)) {
@@ -303,6 +305,83 @@ describe('signal extraction edge cases', () => {
   it('webglRenderer returns empty string when value is not an object', () => {
     const signals = buildSignals({ webGlBasics: { value: 'string-instead' } });
     expect(signals.webglRenderer).toBe('');
+  });
+});
+
+describe('getFontHash', () => {
+  it('returns a non-empty deterministic hash string when document.fonts.check is available', () => {
+    const installedSet = new Set(['Arial', 'Helvetica', 'Menlo', 'Fira Code']);
+    vi.stubGlobal('document', {
+      fonts: {
+        check: (spec) => {
+          // spec is like: 12px "Arial"
+          const match = spec.match(/"([^"]+)"/);
+          return match ? installedSet.has(match[1]) : false;
+        },
+      },
+    });
+    const first = getFontHash();
+    const second = getFontHash();
+    expect(typeof first).toBe('string');
+    expect(first.length).toBeGreaterThan(0);
+    expect(first).toBe(second);
+  });
+
+  it('returns empty string when document.fonts is unavailable', () => {
+    vi.stubGlobal('document', {});
+    expect(getFontHash()).toBe('');
+  });
+
+  it('returns empty string when document.fonts.check is not a function', () => {
+    vi.stubGlobal('document', { fonts: { check: 'not-a-function' } });
+    expect(getFontHash()).toBe('');
+  });
+
+  it('returns empty string when document is undefined', () => {
+    vi.stubGlobal('document', undefined);
+    expect(getFontHash()).toBe('');
+  });
+
+  it('returns different hash for different installed sets', () => {
+    const makeChecker = (set) => (spec) => {
+      const match = spec.match(/"([^"]+)"/);
+      return match ? set.has(match[1]) : false;
+    };
+    vi.stubGlobal('document', {
+      fonts: { check: makeChecker(new Set(['Arial', 'Helvetica'])) },
+    });
+    const hashA = getFontHash();
+    vi.stubGlobal('document', {
+      fonts: { check: makeChecker(new Set(['Verdana', 'Georgia', 'Tahoma'])) },
+    });
+    const hashB = getFontHash();
+    expect(hashA).not.toBe(hashB);
+  });
+
+  it('continues when individual check throws and ignores the failing probe', () => {
+    vi.stubGlobal('document', {
+      fonts: {
+        check: (spec) => {
+          if (spec.includes('"Arial"')) {
+            throw new Error('boom');
+          }
+          return spec.includes('"Helvetica"') || spec.includes('"Menlo"');
+        },
+      },
+    });
+    const hash = getFontHash();
+    expect(typeof hash).toBe('string');
+    expect(hash.length).toBeGreaterThan(0);
+  });
+
+  it('buildSignals includes fontHash in the output', () => {
+    vi.stubGlobal('document', {
+      fonts: { check: () => true },
+    });
+    const signals = buildSignals({});
+    expect(signals).toHaveProperty('fontHash');
+    expect(typeof signals.fontHash).toBe('string');
+    expect(signals.fontHash.length).toBeGreaterThan(0);
   });
 });
 

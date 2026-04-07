@@ -25,6 +25,149 @@ function getCodecSupport() {
   return SUPPORTED_CODECS.filter((codec) => MediaRecorder.isTypeSupported(codec)).join(',');
 }
 
+const FONT_PROBE_LIST = [
+  // Common system fonts (cross-OS)
+  'Arial',
+  'Arial Black',
+  'Arial Narrow',
+  'Arial Rounded MT Bold',
+  'Helvetica',
+  'Helvetica Neue',
+  'Times',
+  'Times New Roman',
+  'Courier',
+  'Courier New',
+  'Verdana',
+  'Georgia',
+  'Palatino',
+  'Garamond',
+  'Bookman',
+  'Comic Sans MS',
+  'Trebuchet MS',
+  'Impact',
+  'Tahoma',
+  'Lucida Console',
+  'Lucida Sans Unicode',
+  'MS Sans Serif',
+  'MS Serif',
+
+  // macOS-specific
+  'San Francisco',
+  'SF Pro',
+  'SF Pro Display',
+  'SF Pro Text',
+  'SF Mono',
+  'Menlo',
+  'Monaco',
+  'Andale Mono',
+  'Apple Chancery',
+  'Apple SD Gothic Neo',
+  'Avenir',
+  'Avenir Next',
+  'Baskerville',
+  'Big Caslon',
+  'Brush Script MT',
+  'Chalkboard',
+  'Chalkduster',
+  'Cochin',
+  'Copperplate',
+  'Didot',
+  'Futura',
+  'Geneva',
+  'Gill Sans',
+  'Hoefler Text',
+  'Marker Felt',
+  'Optima',
+  'Papyrus',
+  'Skia',
+  'Snell Roundhand',
+  'Zapfino',
+
+  // Windows-specific
+  'Calibri',
+  'Cambria',
+  'Candara',
+  'Consolas',
+  'Constantia',
+  'Corbel',
+  'Franklin Gothic Medium',
+  'Gabriola',
+  'Lucida Sans',
+  'Microsoft Sans Serif',
+  'Segoe UI',
+  'Segoe Print',
+  'Segoe Script',
+  'Sylfaen',
+  'Symbol',
+  'Webdings',
+  'Wingdings',
+
+  // Linux-common
+  'DejaVu Sans',
+  'DejaVu Serif',
+  'DejaVu Sans Mono',
+  'Liberation Sans',
+  'Liberation Serif',
+  'Liberation Mono',
+  'Ubuntu',
+  'Ubuntu Mono',
+  'Cantarell',
+
+  // Often installed by Office / productivity software
+  'Calibri Light',
+  'Cambria Math',
+  'Marlett',
+
+  // Often installed by Adobe / creative tools
+  'Adobe Caslon Pro',
+  'Adobe Garamond Pro',
+  'Adobe Jenson Pro',
+  'Birch Std',
+  'Blackoak Std',
+  'Brush Script Std',
+  'Chaparral Pro',
+  'Charlemagne Std',
+  'Cooper Std',
+  'Giddyup Std',
+  'Hobo Std',
+  'Kozuka Gothic Pr6N',
+  'Kozuka Mincho Pr6N',
+  'Letter Gothic Std',
+  'Lithos Pro',
+  'Mesquite Std',
+  'Minion Pro',
+  'Myriad Pro',
+  'Nueva Std',
+  'OCR A Std',
+  'Orator Std',
+  'Poplar Std',
+  'Prestige Elite Std',
+  'Rosewood Std',
+  'Stencil Std',
+  'Tekton Pro',
+  'Trajan Pro',
+
+  // Programming / monospace fonts
+  'Fira Code',
+  'Fira Mono',
+  'Source Code Pro',
+  'Inconsolata',
+  'JetBrains Mono',
+  'Cascadia Code',
+  'IBM Plex Mono',
+
+  // Web-popular display fonts
+  'Roboto',
+  'Open Sans',
+  'Lato',
+  'Montserrat',
+  'Oswald',
+  'Source Sans Pro',
+  'Raleway',
+  'PT Sans',
+  'Merriweather',
+];
+
 function hashString(input) {
   if (input == null) return '';
   const str = String(input);
@@ -75,6 +218,28 @@ function extractString(component, fallback) {
   return typeof value === 'string' && value ? value : (fallback ?? '');
 }
 
+function getFontHash() {
+  if (
+    typeof document === 'undefined' ||
+    !document.fonts ||
+    typeof document.fonts.check !== 'function'
+  ) {
+    return '';
+  }
+  const installed = [];
+  for (const font of FONT_PROBE_LIST) {
+    try {
+      // Quote the font name to handle multi-word names; size is required by the API.
+      if (document.fonts.check(`12px "${font}"`)) {
+        installed.push(font);
+      }
+    } catch {
+      // Ignore individual font check errors and continue.
+    }
+  }
+  return hashString(installed.join(','));
+}
+
 function buildSignals(components) {
   return {
     canvasHash: extractCanvasHash(components.canvas),
@@ -95,6 +260,7 @@ function buildSignals(components) {
     codecSupport: getCodecSupport(),
     dntEnabled: navigator.doNotTrack === '1',
     cookieEnabled: navigator.cookieEnabled,
+    fontHash: getFontHash(),
   };
 }
 
@@ -109,4 +275,4 @@ export async function collectSignals() {
   return buildSignals(result.components);
 }
 
-export const __test__ = { buildSignals, hashString };
+export const __test__ = { buildSignals, hashString, getFontHash };

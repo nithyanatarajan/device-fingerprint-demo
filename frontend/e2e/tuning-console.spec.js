@@ -23,11 +23,17 @@ import { test, expect } from '@playwright/test';
 
 const BACKEND_URL = process.env.E2E_BACKEND_URL || 'http://localhost:8080';
 
-async function openDemoDataAccordion(page) {
-  // Demo Data is collapsed by default in the redesigned layout. Click the
-  // accordion summary button to expand it before interacting with the form.
-  await page.getByRole('button', { name: 'Demo Data' }).click();
+async function openDemoDataTab(page) {
+  // Demo Data lives in its own tab in the redesigned layout. Click the tab
+  // to make the seed form visible before interacting with it.
+  await page.getByRole('tab', { name: 'Demo Data' }).click();
   await expect(page.getByLabel('User name')).toBeVisible({ timeout: 5_000 });
+}
+
+async function openTuneTab(page) {
+  // Switches back to the Tune tab to verify device list state after seeding.
+  await page.getByRole('tab', { name: 'Tune' }).click();
+  await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 5_000 });
 }
 
 async function cleanup(request) {
@@ -77,16 +83,17 @@ test.describe('Tuning Console', () => {
     await resetScoringDefaults(request);
   });
 
-  test('renders the four primary sections and the sticky preview banner at /admin', async ({
-    page,
-  }) => {
+  test('renders Tune tab content by default and exposes a Demo Data tab', async ({ page }) => {
     await page.goto('/admin');
     await expect(page.getByRole('heading', { name: 'Tuning Console', level: 4 })).toBeVisible();
+    // Tune tab is the default and shows the four primary sections
     await expect(page.getByRole('heading', { name: 'Signal Weights', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Thresholds', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Demo Data' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Users & Devices', exact: true })).toBeVisible();
     await expect(page.getByTestId('preview-summary-banner')).toBeVisible();
+    // Demo Data is now its own tab (not visible content)
+    await expect(page.getByRole('tab', { name: 'Tune' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Demo Data' })).toBeVisible();
   });
 
   test('seed form creates a user, auto-expanded device row exposes signature and public ip', async ({
@@ -94,17 +101,18 @@ test.describe('Tuning Console', () => {
   }) => {
     await page.goto('/admin');
     await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
-    await openDemoDataAccordion(page);
+    await openDemoDataTab(page);
 
     await page.getByLabel('User name').fill('e2e-signature');
     await page.getByRole('button', { name: 'Seed', exact: true }).click();
+    // Last result chip is rendered (still on Demo Data tab)
+    await expect(page.getByText('Last result')).toBeVisible();
 
-    // User appears in the list
+    // Switch back to Tune tab to verify the user appears in the device list
+    await openTuneTab(page);
     await expect(page.getByTestId('user-section-demo-user-e2e-signature')).toBeVisible({
       timeout: 10_000,
     });
-    // Last result chip is rendered
-    await expect(page.getByText('Last result')).toBeVisible();
 
     // No click needed — users auto-expand on load. Scope to the seeded
     // user's section so leftover users from earlier tests don't pollute.
@@ -122,34 +130,35 @@ test.describe('Tuning Console', () => {
   test('seeding two different browsers produces two user rows', async ({ page }) => {
     await page.goto('/admin');
     await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
-    await openDemoDataAccordion(page);
+    await openDemoDataTab(page);
 
     // First: Chrome regular
     await page.getByLabel('User name').fill('e2e-chrome');
     await page.getByRole('button', { name: 'Seed', exact: true }).click();
-    await expect(page.getByTestId('user-section-demo-user-e2e-chrome')).toBeVisible({
-      timeout: 10_000,
-    });
+    // Wait for the Last result chip so we know the seed call resolved
+    await expect(page.getByText('Last result')).toBeVisible({ timeout: 10_000 });
 
-    // Second: Firefox incognito
+    // Second: Firefox incognito (still on Demo Data tab)
     await page.getByLabel('User name').fill('e2e-firefox');
-    // Open the Browser select and pick Firefox
     await page.getByLabel('Browser').click();
     await page.getByRole('option', { name: 'Firefox' }).click();
     await page.getByTestId('seed-incognito-switch').click();
     await page.getByRole('button', { name: 'Seed', exact: true }).click();
+    // Allow the second seed call to round-trip before switching tabs
+    await page.waitForTimeout(300);
 
+    // Switch back to Tune to verify both users appear in the device list
+    await openTuneTab(page);
     await expect(page.getByTestId('user-section-demo-user-e2e-firefox')).toBeVisible({
       timeout: 10_000,
     });
-    // Both users still visible
     await expect(page.getByTestId('user-section-demo-user-e2e-chrome')).toBeVisible();
   });
 
   test('empty user name suffix disables Seed and surfaces helper text', async ({ page }) => {
     await page.goto('/admin');
     await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
-    await openDemoDataAccordion(page);
+    await openDemoDataTab(page);
 
     const input = page.getByLabel('User name');
     await input.fill('');
@@ -160,67 +169,66 @@ test.describe('Tuning Console', () => {
   test('clear-all dialog Cancel preserves data', async ({ page }) => {
     await page.goto('/admin');
     await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
-    await openDemoDataAccordion(page);
+    await openDemoDataTab(page);
 
     await page.getByLabel('User name').fill('e2e-cancel');
     await page.getByRole('button', { name: 'Seed', exact: true }).click();
-    await expect(page.getByTestId('user-section-demo-user-e2e-cancel')).toBeVisible({
-      timeout: 10_000,
-    });
+    await expect(page.getByText('Last result')).toBeVisible({ timeout: 10_000 });
 
     await page.getByRole('button', { name: 'Clear all demo data' }).click();
     await expect(page.getByRole('heading', { name: 'Clear all demo data?' })).toBeVisible();
     // Dialog body shows the count summary
     await expect(page.getByText(/This will delete \d+ user/)).toBeVisible();
     await page.getByRole('button', { name: 'Cancel' }).click();
-    // Dialog closes, user still there
+    // Dialog closes
     await expect(page.getByRole('heading', { name: 'Clear all demo data?' })).toHaveCount(0);
+
+    // Switch back to Tune to verify the user is still in the device list
+    await openTuneTab(page);
     await expect(page.getByTestId('user-section-demo-user-e2e-cancel')).toBeVisible();
   });
 
   test('clear-all dialog Confirm empties the demo data', async ({ page }) => {
     await page.goto('/admin');
     await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
-    await openDemoDataAccordion(page);
+    await openDemoDataTab(page);
 
     await page.getByLabel('User name').fill('e2e-confirm');
     await page.getByRole('button', { name: 'Seed', exact: true }).click();
-    await expect(page.getByTestId('user-section-demo-user-e2e-confirm')).toBeVisible({
-      timeout: 10_000,
-    });
+    await expect(page.getByText('Last result')).toBeVisible({ timeout: 10_000 });
 
     await page.getByRole('button', { name: 'Clear all demo data' }).click();
     await expect(page.getByRole('heading', { name: 'Clear all demo data?' })).toBeVisible();
     await page.getByRole('button', { name: 'Clear', exact: true }).click();
-
-    // Seeded user is gone
-    await expect(page.getByTestId('user-section-demo-user-e2e-confirm')).toHaveCount(0, {
-      timeout: 10_000,
-    });
     // Snackbar surfaces the cleared counts (>=1 user). Tolerant of any other
     // demo data that other test files may have left behind.
     await expect(page.getByText(/Cleared: \d+ user\(s\)/)).toBeVisible();
+
+    // Switch back to Tune to verify the user is gone from the device list
+    await openTuneTab(page);
+    await expect(page.getByTestId('user-section-demo-user-e2e-confirm')).toHaveCount(0, {
+      timeout: 10_000,
+    });
   });
 
   test('ripple effect preview fires when canvas_hash slider moves', async ({ page }) => {
     await page.goto('/admin');
     await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
-    await openDemoDataAccordion(page);
+    await openDemoDataTab(page);
 
     // Seed two visits for the same user so the device has >=2 fingerprints
     // (the preview endpoint only reclassifies devices with >=2 fingerprints).
     await page.getByLabel('User name').fill('e2e-ripple');
     await page.getByRole('button', { name: 'Seed', exact: true }).click();
-    await expect(page.getByTestId('user-section-demo-user-e2e-ripple')).toBeVisible({
-      timeout: 10_000,
-    });
+    await expect(page.getByText('Last result')).toBeVisible({ timeout: 10_000 });
     // Toggle incognito to force a second fingerprint with different canvas
     await page.getByTestId('seed-incognito-switch').click();
     await page.getByRole('button', { name: 'Seed', exact: true }).click();
-
-    // Wait for second visit to register — deviceCount text on the user row
-    // should update. Give it a moment.
+    // Allow the second seed call to round-trip before switching tabs
     await page.waitForTimeout(500);
+
+    // Switch back to Tune so the slider drag triggers the preview hook
+    await openTuneTab(page);
 
     // Wait for preview request to listen for
     const previewRequest = page.waitForRequest(

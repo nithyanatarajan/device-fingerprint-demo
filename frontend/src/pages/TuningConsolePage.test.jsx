@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import TuningConsolePage from './TuningConsolePage';
 
@@ -33,12 +34,23 @@ describe('TuningConsolePage', () => {
     expect(screen.getByRole('heading', { name: 'Tuning Console', level: 4 })).toBeInTheDocument();
   });
 
-  it('renders the four primary section headings', () => {
+  it('renders the Tune tab content by default — sliders and devices, no Demo Data', () => {
     render(<TuningConsolePage />);
     expect(screen.getByRole('heading', { name: 'Signal Weights', level: 6 })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Thresholds', level: 6 })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Demo Data', level: 6 })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Users & Devices', level: 6 })).toBeInTheDocument();
+    // Both tabs exist; Tune is selected by default
+    expect(screen.getByRole('tab', { name: 'Tune', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Demo Data', selected: false })).toBeInTheDocument();
+  });
+
+  it('switches to the Demo Data tab when clicked', async () => {
+    const user = userEvent.setup();
+    render(<TuningConsolePage />);
+    await user.click(screen.getByRole('tab', { name: 'Demo Data' }));
+    // Demo Data section is now visible
+    expect(screen.getByRole('heading', { name: 'Demo Data', level: 6 })).toBeInTheDocument();
+    expect(screen.getByLabelText('User name')).toBeInTheDocument();
   });
 
   it('shows the idle preview hint when there is no preview yet', () => {

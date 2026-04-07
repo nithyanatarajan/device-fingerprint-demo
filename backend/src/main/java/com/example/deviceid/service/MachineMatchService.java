@@ -6,10 +6,12 @@ import com.example.deviceid.domain.User;
 import com.example.deviceid.dto.MachineMatch;
 import com.example.deviceid.dto.MachineMatchResult;
 import com.example.deviceid.repository.DeviceFingerprintRepository;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -77,11 +79,11 @@ public class MachineMatchService {
       if (!currentUserId.equals(device.getUser().getId())) {
         continue;
       }
-      // Hard gates: timezone and locale must co-match (null == null counts as a match).
-      if (!Objects.equals(fp.getTimezone(), current.getTimezone())) {
+      // Hard gates: timezone and locale must co-match.
+      if (!timezonesMatch(fp.getTimezone(), current.getTimezone())) {
         continue;
       }
-      if (!Objects.equals(fp.getLocale(), current.getLocale())) {
+      if (!localesMatch(fp.getLocale(), current.getLocale())) {
         continue;
       }
       UUID deviceId = device.getId();
@@ -127,5 +129,52 @@ public class MachineMatchService {
       return false;
     }
     return currentIp.equals(candidateIp);
+  }
+
+  /**
+   * Two timezone strings match if they are equal, both null, or refer to the same set of offset
+   * rules under the IANA database. The latter handles aliases like {@code Asia/Calcutta} (legacy)
+   * vs {@code Asia/Kolkata} (canonical) — both refer to IST (UTC+05:30) and Java's {@link
+   * java.time.zone.ZoneRules#equals(Object)} treats them as identical. Without this
+   * canonicalisation a Chrome user (whose V8 ICU data ships the legacy alias) and a Firefox user
+   * (which ships the canonical name) on the same machine would fail the gate even though they are
+   * in the same physical timezone.
+   */
+  private boolean timezonesMatch(String a, String b) {
+    if (Objects.equals(a, b)) {
+      return true;
+    }
+    if (a == null || b == null) {
+      return false;
+    }
+    try {
+      return ZoneId.of(a).getRules().equals(ZoneId.of(b).getRules());
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  /**
+   * Two locale strings match if they are equal, both null, or share the same primary language tag.
+   * Region differences are intentionally ignored: {@code en-GB} and {@code en-US} both denote
+   * English and are treated as a match for the purposes of machine identity. This is the right
+   * trade-off because browsers diverge on region preference for trivial reasons (Firefox defaults
+   * to {@code en-US} on install, Chrome inherits the OS locale), and {@code locale} is a user-
+   * config detail rather than a hardware property. The language code is still a hard gate — {@code
+   * en-US} and {@code de-DE} do not match.
+   */
+  private boolean localesMatch(String a, String b) {
+    if (Objects.equals(a, b)) {
+      return true;
+    }
+    if (a == null || b == null) {
+      return false;
+    }
+    String langA = Locale.forLanguageTag(a).getLanguage();
+    String langB = Locale.forLanguageTag(b).getLanguage();
+    if (langA.isEmpty() || langB.isEmpty()) {
+      return false;
+    }
+    return langA.equals(langB);
   }
 }

@@ -9,14 +9,35 @@ import org.springframework.stereotype.Component;
 /**
  * Computes a stable, browser-independent machine signature over hardware-only signals.
  *
- * <p>The hash spans 6 hardware signals: platform, screenResolution, colorDepth,
- * hardwareConcurrency, deviceMemory, touchSupport.
+ * <p>The hash spans 4 hardware signals: platform, screenResolution, pixelRatio, touchSupport.
  *
- * <p>Browser-specific signals (canvas, webgl, userAgent, codec, locale, pixelRatio, dntEnabled,
- * cookieEnabled) are deliberately excluded so the signature remains stable across different
- * browsers running on the same machine. {@code timezone} is also excluded — it is an OS setting
- * that changes when the user travels or on DST transitions, and including it would silently break
- * machine recognition for a user crossing timezones on the same laptop.
+ * <p>Signals deliberately excluded from the hash, with reasons:
+ *
+ * <ul>
+ *   <li><b>canvas, webgl, userAgent, codec, locale, dntEnabled, cookieEnabled</b> — browser-
+ *       specific or user-preference. Change per browser on the same machine.
+ *   <li><b>timezone</b> — OS setting that changes when the user travels or on DST transitions.
+ *       Handled as a hard co-match gate in {@code MachineMatchService} (alias-aware).
+ *   <li><b>deviceMemory</b> — the Device Memory API is Chromium-only. Firefox and Safari return
+ *       {@code undefined} → {@code null} in our DTO.
+ *   <li><b>colorDepth</b> — Safari deliberately reports {@code 24} on Display P3 panels even though
+ *       the hardware supports 30-bit colour, as anti-fingerprinting. Chrome and Firefox report the
+ *       actual {@code 30}. Including this signal would cause the same Apple Silicon machine to
+ *       produce different hashes across browser families.
+ *   <li><b>hardwareConcurrency</b> — WebKit caps {@code navigator.hardwareConcurrency} at 8
+ *       regardless of the actual logical core count, also as anti-fingerprinting. A 12-core MacBook
+ *       reports 12 in Chrome and Firefox but 8 in Safari.
+ * </ul>
+ *
+ * <p>The principle: a signal only belongs in the hash if every major browser reports it identically
+ * for the same physical hardware. Anything that varies for browser-API or browser- privacy reasons
+ * would silently break cross-browser machine recognition — the very property the hash exists to
+ * provide.
+ *
+ * <p>The trade-off is reduced entropy. With 4 signals the global combination space is small (~1,500
+ * buckets), but per-user scoping in {@code MachineMatchService} contains the collision risk:
+ * matches are only computed against the current user's own devices (typically 1–3), not the global
+ * population.
  */
 @Component
 public class MachineSignatureService {
@@ -26,9 +47,7 @@ public class MachineSignatureService {
     StringBuilder sb = new StringBuilder();
     sb.append(serialize(fp.getPlatform())).append('|');
     sb.append(serialize(fp.getScreenResolution())).append('|');
-    sb.append(serialize(fp.getColorDepth())).append('|');
-    sb.append(serialize(fp.getHardwareConcurrency())).append('|');
-    sb.append(serialize(fp.getDeviceMemory())).append('|');
+    sb.append(serialize(fp.getPixelRatio())).append('|');
     sb.append(serialize(fp.getTouchSupport()));
 
     try {

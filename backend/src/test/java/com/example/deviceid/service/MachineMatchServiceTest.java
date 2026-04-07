@@ -26,8 +26,11 @@ class MachineMatchServiceTest {
   private static final String IP_2 = "203.0.113.20";
   private static final String TZ_NY = "America/New_York";
   private static final String TZ_LONDON = "Europe/London";
+  private static final String TZ_KOLKATA = "Asia/Kolkata";
+  private static final String TZ_CALCUTTA_LEGACY = "Asia/Calcutta";
   private static final String LOCALE_EN_US = "en-US";
   private static final String LOCALE_EN_GB = "en-GB";
+  private static final String LOCALE_DE_DE = "de-DE";
 
   @Autowired private MachineMatchService machineMatchService;
   @Autowired private UserRepository userRepository;
@@ -94,10 +97,11 @@ class MachineMatchServiceTest {
   }
 
   @Test
-  void noMatchWhenSignatureMatchesButLocaleDiffers() {
+  void noMatchWhenSignatureMatchesButLanguageDiffers() {
+    // Different primary language (en vs de) is a hard gate failure.
     User user = createUser("userA");
     Device priorDevice = createDevice(user, "Prior Device");
-    saveFingerprint(priorDevice, SIG_A, IP_1, TZ_NY, LOCALE_EN_GB);
+    saveFingerprint(priorDevice, SIG_A, IP_1, TZ_NY, LOCALE_DE_DE);
 
     Device current = createDevice(user, "Current Device");
     DeviceFingerprint currentFp = saveFingerprint(current, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
@@ -105,6 +109,70 @@ class MachineMatchServiceTest {
     MachineMatchResult result = machineMatchService.findMatches(currentFp);
 
     assertThat(result.strongMatches()).isEmpty();
+    assertThat(result.possibleMatches()).isEmpty();
+  }
+
+  @Test
+  void localeRegionDifferenceIsIgnoredWhenLanguageMatches() {
+    // en-GB and en-US share the same primary language (en) and must be treated as a locale match.
+    // Real-world driver: Chrome inherits the OS locale (en-GB) while Firefox defaults to en-US on
+    // install — same machine, same user, but different browser language preferences.
+    User user = createUser("userA");
+    Device priorDevice = createDevice(user, "Prior Device");
+    DeviceFingerprint priorFp = saveFingerprint(priorDevice, SIG_A, IP_1, TZ_NY, LOCALE_EN_GB);
+
+    Device current = createDevice(user, "Current Device");
+    DeviceFingerprint currentFp = saveFingerprint(current, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
+
+    MachineMatchResult result = machineMatchService.findMatches(currentFp);
+
+    assertThat(result.strongMatches())
+        .extracting(MachineMatch::deviceId)
+        .containsExactly(priorFp.getDevice().getId());
+    assertThat(result.possibleMatches()).isEmpty();
+  }
+
+  @Test
+  void timezoneAliasIsTreatedAsMatch() {
+    // Asia/Calcutta (legacy IANA alias) and Asia/Kolkata (canonical) refer to the same set of
+    // offset rules — both are IST (UTC+05:30). Real-world driver: Chrome's V8 ICU data ships the
+    // legacy alias while Firefox ships the canonical name. Without alias-aware comparison, the
+    // same physical machine viewed from the two browsers fails the timezone gate.
+    User user = createUser("userA");
+    Device priorDevice = createDevice(user, "Prior Device");
+    DeviceFingerprint priorFp =
+        saveFingerprint(priorDevice, SIG_A, IP_1, TZ_CALCUTTA_LEGACY, LOCALE_EN_US);
+
+    Device current = createDevice(user, "Current Device");
+    DeviceFingerprint currentFp = saveFingerprint(current, SIG_A, IP_1, TZ_KOLKATA, LOCALE_EN_US);
+
+    MachineMatchResult result = machineMatchService.findMatches(currentFp);
+
+    assertThat(result.strongMatches())
+        .extracting(MachineMatch::deviceId)
+        .containsExactly(priorFp.getDevice().getId());
+    assertThat(result.possibleMatches()).isEmpty();
+  }
+
+  @Test
+  void chromeFirefoxRealWorldPayloadProducesStrongMatch() {
+    // End-to-end exercise of the gate fixes against the actual payload shapes captured from
+    // Chrome and Firefox running on the same MacBook: Chrome reports timezone Asia/Calcutta and
+    // locale en-GB; Firefox reports timezone Asia/Kolkata and locale en-US. The hash, IP, and
+    // remaining hardware are identical. The result must be a strong match.
+    User user = createUser("userA");
+    Device priorDevice = createDevice(user, "Chrome");
+    DeviceFingerprint priorFp =
+        saveFingerprint(priorDevice, SIG_A, IP_1, TZ_CALCUTTA_LEGACY, LOCALE_EN_GB);
+
+    Device current = createDevice(user, "Firefox");
+    DeviceFingerprint currentFp = saveFingerprint(current, SIG_A, IP_1, TZ_KOLKATA, LOCALE_EN_US);
+
+    MachineMatchResult result = machineMatchService.findMatches(currentFp);
+
+    assertThat(result.strongMatches())
+        .extracting(MachineMatch::deviceId)
+        .containsExactly(priorFp.getDevice().getId());
     assertThat(result.possibleMatches()).isEmpty();
   }
 

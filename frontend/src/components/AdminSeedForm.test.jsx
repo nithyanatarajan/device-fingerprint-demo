@@ -7,6 +7,7 @@ vi.mock('../services/api', () => ({
   seedDemoUser: vi.fn(),
   getSeedSummary: vi.fn(),
   clearSeedData: vi.fn(),
+  seedScenario: vi.fn(),
 }));
 
 import { seedDemoUser, getSeedSummary, clearSeedData } from '../services/api';

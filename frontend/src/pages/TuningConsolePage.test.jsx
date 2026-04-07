@@ -5,13 +5,16 @@ import TuningConsolePage from './TuningConsolePage';
 vi.mock('../services/api', () => ({
   getScoringWeights: vi.fn(),
   updateScoringWeights: vi.fn(),
+  resetScoringWeights: vi.fn(),
   getScoringConfig: vi.fn(),
   updateScoringConfig: vi.fn(),
+  resetScoringConfig: vi.fn(),
   getUsers: vi.fn().mockResolvedValue([]),
   getUserDevices: vi.fn().mockResolvedValue([]),
   seedDemoUser: vi.fn(),
   getSeedSummary: vi.fn().mockResolvedValue({ users: 0, devices: 0, fingerprints: 0 }),
   clearSeedData: vi.fn(),
+  seedScenario: vi.fn(),
   previewScoring: vi.fn(),
 }));
 

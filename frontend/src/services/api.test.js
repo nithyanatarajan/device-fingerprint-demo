@@ -11,6 +11,9 @@ import {
   seedDemoUser,
   getSeedSummary,
   clearSeedData,
+  resetScoringWeights,
+  resetScoringConfig,
+  seedScenario,
 } from './api';
 
 const mockFetch = vi.fn();
@@ -182,6 +185,36 @@ describe('api service', () => {
     await clearSeedData();
     expect(mockFetch).toHaveBeenCalledWith('/api/admin/seed', {
       method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
+  it('resetScoringWeights posts to /api/scoring/weights/reset', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ canvas_hash: { weight: 90, enabled: true } }));
+
+    await resetScoringWeights();
+    expect(mockFetch).toHaveBeenCalledWith('/api/scoring/weights/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
+  it('resetScoringConfig posts to /api/scoring/config/reset', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ sameDeviceThreshold: 85, driftThreshold: 60 }));
+
+    await resetScoringConfig();
+    expect(mockFetch).toHaveBeenCalledWith('/api/scoring/config/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
+  it('seedScenario posts to /api/admin/seed/scenario', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse([]));
+
+    await seedScenario();
+    expect(mockFetch).toHaveBeenCalledWith('/api/admin/seed/scenario', {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });
   });

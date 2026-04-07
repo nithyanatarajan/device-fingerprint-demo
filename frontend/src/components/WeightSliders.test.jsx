@@ -6,9 +6,10 @@ import WeightSliders from './WeightSliders';
 vi.mock('../services/api', () => ({
   getScoringWeights: vi.fn(),
   updateScoringWeights: vi.fn(),
+  resetScoringWeights: vi.fn(),
 }));
 
-import { getScoringWeights, updateScoringWeights } from '../services/api';
+import { getScoringWeights, updateScoringWeights, resetScoringWeights } from '../services/api';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -91,21 +92,30 @@ describe('WeightSliders', () => {
     });
   });
 
-  it('reset re-fetches from server', async () => {
+  it('reset calls POST /weights/reset and applies the canonical defaults without unmounting sliders', async () => {
     const user = userEvent.setup();
-    getScoringWeights.mockResolvedValue({ canvas_hash: { weight: 90, enabled: true } });
+    // Server starts with a polluted weight value (canvas at 7) so we can prove
+    // reset actually moved it back to the canonical default returned by the API.
+    getScoringWeights.mockResolvedValue({ canvas_hash: { weight: 7, enabled: false } });
+    resetScoringWeights.mockResolvedValue({ canvas_hash: { weight: 90, enabled: true } });
 
     render(<WeightSliders />);
     await waitFor(() => {
       expect(screen.getByText('canvas_hash')).toBeInTheDocument();
     });
+    expect(screen.getByText('7')).toBeInTheDocument();
 
-    getScoringWeights.mockClear();
     await user.click(screen.getByRole('button', { name: 'Reset to defaults' }));
 
     await waitFor(() => {
-      expect(getScoringWeights).toHaveBeenCalled();
+      expect(resetScoringWeights).toHaveBeenCalled();
     });
+    await waitFor(() => {
+      expect(screen.getByText('90')).toBeInTheDocument();
+    });
+    // Slider stays mounted throughout — the previous bug was that handleReset
+    // toggled the global loading flag, which unmounted every slider mid-click.
+    expect(screen.getByLabelText('canvas_hash weight')).toBeInTheDocument();
   });
 
   it('shows error when fetch fails', async () => {
@@ -113,6 +123,23 @@ describe('WeightSliders', () => {
     render(<WeightSliders />);
     await waitFor(() => {
       expect(screen.getByText('boom')).toBeInTheDocument();
+    });
+  });
+
+  it('shows error when reset fails', async () => {
+    const user = userEvent.setup();
+    getScoringWeights.mockResolvedValue({ canvas_hash: { weight: 7, enabled: true } });
+    resetScoringWeights.mockRejectedValue(new Error('reset boom'));
+
+    render(<WeightSliders />);
+    await waitFor(() => {
+      expect(screen.getByText('canvas_hash')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Reset to defaults' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('reset boom')).toBeInTheDocument();
     });
   });
 });

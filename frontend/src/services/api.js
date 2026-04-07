@@ -72,3 +72,15 @@ export function clearSeedData() {
     method: 'DELETE',
   });
 }
+
+export function resetScoringWeights() {
+  return request('/api/scoring/weights/reset', { method: 'POST' });
+}
+
+export function resetScoringConfig() {
+  return request('/api/scoring/config/reset', { method: 'POST' });
+}
+
+export function seedScenario() {
+  return request('/api/admin/seed/scenario', { method: 'POST' });
+}

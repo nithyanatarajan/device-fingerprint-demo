@@ -7,30 +7,45 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
-import { getScoringWeights, updateScoringWeights } from '../services/api';
+import { getScoringWeights, resetScoringWeights, updateScoringWeights } from '../services/api';
 
 export default function WeightSliders({ onChange }) {
   const [weights, setWeights] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [error, setError] = useState(null);
 
-  const load = () => {
+  useEffect(() => {
     setLoading(true);
     setError(null);
-    return getScoringWeights()
+    getScoringWeights()
       .then((data) => {
         setWeights(data);
         if (onChange) onChange(data);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Reset goes through POST /weights/reset which both restores backend defaults
+  // and returns the new state. We deliberately do NOT toggle the global loading
+  // flag here — it would unmount every slider mid-interaction and feel jarring.
+  // Sliders just smoothly snap to the new values when the response lands.
+  const handleReset = async () => {
+    setResetting(true);
+    setError(null);
+    try {
+      const fresh = await resetScoringWeights();
+      setWeights(fresh);
+      if (onChange) onChange(fresh);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const updateWeight = (signal, value) => {
     const next = { ...weights, [signal]: { ...weights[signal], weight: value } };
@@ -105,10 +120,10 @@ export default function WeightSliders({ onChange }) {
         })}
       </Stack>
       <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
-        <Button variant="outlined" onClick={load} disabled={saving}>
-          Reset to defaults
+        <Button variant="outlined" onClick={handleReset} disabled={saving || resetting}>
+          {resetting ? <CircularProgress size={20} /> : 'Reset to defaults'}
         </Button>
-        <Button variant="contained" onClick={handleSave} disabled={saving}>
+        <Button variant="contained" onClick={handleSave} disabled={saving || resetting}>
           {saving ? <CircularProgress size={20} /> : 'Save weights'}
         </Button>
       </Stack>

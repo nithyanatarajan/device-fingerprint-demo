@@ -32,7 +32,8 @@ describe('UserDevicesList', () => {
     expect(screen.getByText('1 device(s)')).toBeInTheDocument();
   });
 
-  it('eagerly loads devices for every user without requiring a click', async () => {
+  it('eagerly loads devices for every user; details visible after row click', async () => {
+    const user = userEvent.setup();
     getUsers.mockResolvedValue([{ id: 'u1', name: 'alice', deviceCount: 1 }]);
     getUserDevices.mockResolvedValue([
       {
@@ -47,17 +48,24 @@ describe('UserDevicesList', () => {
 
     render(<UserDevicesList />);
 
-    // Devices visible WITHOUT any click — auto-expand on load.
+    // Compact row appears without any click — label + score visible
     await waitFor(() => {
       expect(screen.getByText('Chrome on Mac')).toBeInTheDocument();
     });
     expect(getUserDevices).toHaveBeenCalledWith('u1');
-    expect(screen.getByText(/abcd1234abcd1234/)).toBeInTheDocument();
+
+    // Details (sig, ip, visits, last seen) hidden until row is clicked
+    expect(screen.queryByText(/abcd1234abcd1234/)).not.toBeInTheDocument();
+    await user.click(screen.getByTestId('device-row-button-d1'));
+    await waitFor(() => {
+      expect(screen.getByText(/abcd1234abcd1234/)).toBeInTheDocument();
+    });
     expect(screen.getByText(/1\.2\.3\.4/)).toBeInTheDocument();
     expect(screen.getByText(/visits: 5/)).toBeInTheDocument();
   });
 
-  it('shows null sig and ip when missing', async () => {
+  it('shows null sig and ip when missing once details are expanded', async () => {
+    const user = userEvent.setup();
     getUsers.mockResolvedValue([{ id: 'u1', name: 'alice', deviceCount: 1 }]);
     getUserDevices.mockResolvedValue([
       {
@@ -71,6 +79,9 @@ describe('UserDevicesList', () => {
     ]);
 
     render(<UserDevicesList />);
+    await waitFor(() => expect(screen.getByText('Chrome')).toBeInTheDocument());
+
+    await user.click(screen.getByTestId('device-row-button-d1'));
     await waitFor(() => {
       expect(screen.getByText(/sig: null/)).toBeInTheDocument();
     });

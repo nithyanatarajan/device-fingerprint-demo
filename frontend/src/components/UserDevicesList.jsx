@@ -30,8 +30,6 @@ function formatScore(value) {
 }
 
 function ScoreDisplay({ previewDevice }) {
-  // No preview data yet (hook hasn't fired) → render a placeholder so the
-  // layout doesn't shift when the data lands.
   if (!previewDevice) {
     return (
       <Typography variant="caption" color="text.disabled" data-testid="device-score">
@@ -40,10 +38,6 @@ function ScoreDisplay({ previewDevice }) {
     );
   }
 
-  // Single-fingerprint devices have nothing to score against (the preview
-  // service compares latest vs second-latest visit). Show an explicit
-  // "no history yet" hint instead of a misleading "score: 0.0", which
-  // looked like a bug to people watching the demo.
   if (previewDevice.fingerprintCount != null && previewDevice.fingerprintCount < 2) {
     return (
       <Typography
@@ -91,61 +85,94 @@ function ScoreDisplay({ previewDevice }) {
 }
 
 function DeviceRow({ device, previewDevice }) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const isSingleFingerprint =
     previewDevice?.fingerprintCount != null && previewDevice.fingerprintCount < 2;
-  // Single-fingerprint devices never get highlighted because their transition
-  // is always degenerate (NEW_DEVICE → NEW_DEVICE).
   const transition = isSingleFingerprint ? 'UNCHANGED' : previewDevice?.transition || 'UNCHANGED';
+
   return (
     <Box
       data-testid={`device-row-${device.id}`}
       data-transition={transition}
       sx={{
-        py: 1,
-        px: 2,
         borderBottom: '1px solid',
         borderColor: 'divider',
         backgroundColor: TRANSITION_BG[transition],
       }}
     >
-      <Typography variant="body2" component="div">
-        {device.label}
-      </Typography>
-      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 0.5 }}>
+      {/* Compact row — only the must-see fields. Click to expand details
+          (sig, ip, last seen, visits). The click target also doubles as the
+          Phase 4 investigation hook once that lands. */}
+      <Box
+        component="button"
+        type="button"
+        onClick={() => setDetailsOpen((prev) => !prev)}
+        aria-expanded={detailsOpen}
+        aria-controls={`device-details-${device.id}`}
+        data-testid={`device-row-button-${device.id}`}
+        sx={{
+          width: '100%',
+          textAlign: 'left',
+          background: 'transparent',
+          border: 0,
+          cursor: 'pointer',
+          py: 1,
+          px: 2,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2,
+          flexWrap: 'wrap',
+          '&:hover': { backgroundColor: 'action.hover' },
+        }}
+      >
+        <Typography variant="body2" sx={{ fontWeight: 500, flexShrink: 0 }}>
+          {device.label}
+        </Typography>
         <ScoreDisplay previewDevice={previewDevice} />
-        <Typography
-          variant="caption"
-          sx={{
-            fontFamily: 'monospace',
-            color: device.machineSignature ? 'text.primary' : 'text.disabled',
-          }}
-        >
-          sig: {device.machineSignature || 'null'}
-        </Typography>
-        <Typography
-          variant="caption"
-          sx={{ color: device.publicIp ? 'text.primary' : 'text.disabled' }}
-        >
-          ip: {device.publicIp || 'null'}
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          last seen: {formatLastSeen(device.lastSeenAt)}
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          visits: {device.visitCount}
-        </Typography>
-      </Box>
-      {!isSingleFingerprint && previewDevice && previewDevice.transition !== 'UNCHANGED' && (
-        <Box sx={{ display: 'flex', gap: 1, mt: 0.5, alignItems: 'center' }}>
-          <Chip size="small" label={previewDevice.currentClassification} variant="outlined" />
-          <Typography variant="caption">→</Typography>
-          <Chip
-            size="small"
-            label={previewDevice.proposedClassification}
-            color={previewDevice.transition === 'PROMOTED' ? 'success' : 'error'}
-          />
+        {!isSingleFingerprint && previewDevice && previewDevice.transition !== 'UNCHANGED' && (
+          <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', ml: 'auto' }}>
+            <Chip size="small" label={previewDevice.currentClassification} variant="outlined" />
+            <Typography variant="caption">→</Typography>
+            <Chip
+              size="small"
+              label={previewDevice.proposedClassification}
+              color={previewDevice.transition === 'PROMOTED' ? 'success' : 'error'}
+            />
+          </Box>
+        )}
+        <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center' }}>
+          {detailsOpen ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
         </Box>
-      )}
+      </Box>
+
+      <Collapse in={detailsOpen} timeout="auto" unmountOnExit>
+        <Box
+          id={`device-details-${device.id}`}
+          sx={{ px: 2, pb: 1, display: 'flex', gap: 2, flexWrap: 'wrap' }}
+        >
+          <Typography
+            variant="caption"
+            sx={{
+              fontFamily: 'monospace',
+              color: device.machineSignature ? 'text.primary' : 'text.disabled',
+            }}
+          >
+            sig: {device.machineSignature || 'null'}
+          </Typography>
+          <Typography
+            variant="caption"
+            sx={{ color: device.publicIp ? 'text.primary' : 'text.disabled' }}
+          >
+            ip: {device.publicIp || 'null'}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            last seen: {formatLastSeen(device.lastSeenAt)}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            visits: {device.visitCount}
+          </Typography>
+        </Box>
+      </Collapse>
     </Box>
   );
 }
@@ -215,7 +242,7 @@ export default function UserDevicesList({ refreshKey = 0, previewByDeviceId = {}
   if (users.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary">
-        No users yet. Use Demo Data above to seed some.
+        No users yet. Open the Demo Data tab to seed some.
       </Typography>
     );
   }

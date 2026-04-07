@@ -114,13 +114,15 @@ test.describe('Tuning Console', () => {
       timeout: 10_000,
     });
 
-    // No click needed — users auto-expand on load. Scope to the seeded
-    // user's section so leftover users from earlier tests don't pollute.
+    // Compact rows hide sig/ip behind a click-to-expand. Scope the row
+    // lookup to the seeded user's section, click to expand, then assert
+    // on the now-visible details.
     const deviceRow = page
       .getByTestId('user-section-demo-user-e2e-signature')
       .locator('[data-testid^="device-row-"]')
       .first();
     await expect(deviceRow).toBeVisible({ timeout: 10_000 });
+    await deviceRow.locator('[data-testid^="device-row-button-"]').click();
     // Non-VPN public IP is the backend's NON_VPN_IP constant
     await expect(deviceRow).toContainText('ip: 203.0.113.42');
     // Signature rendered as 16 hex chars

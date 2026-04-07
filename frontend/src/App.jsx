@@ -5,8 +5,8 @@ import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
-import Box from '@mui/material/Box';
 import CollectionPage from './pages/CollectionPage';
+import TuningConsolePage from './pages/TuningConsolePage';
 
 const theme = createTheme();
 
@@ -30,15 +30,6 @@ function NavBar() {
   );
 }
 
-function PlaceholderAdmin() {
-  return (
-    <Box sx={{ p: 4 }}>
-      <Typography variant="h5">Tuning Console</Typography>
-      <Typography>Coming soon.</Typography>
-    </Box>
-  );
-}
-
 export default function App() {
   return (
     <ThemeProvider theme={theme}>
@@ -47,7 +38,7 @@ export default function App() {
         <NavBar />
         <Routes>
           <Route path="/" element={<CollectionPage />} />
-          <Route path="/admin" element={<PlaceholderAdmin />} />
+          <Route path="/admin" element={<TuningConsolePage />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>

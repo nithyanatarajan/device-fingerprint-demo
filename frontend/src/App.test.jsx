@@ -9,6 +9,16 @@ vi.mock('./services/fingerprint', () => ({
 
 vi.mock('./services/api', () => ({
   collectFingerprint: vi.fn(),
+  getUsers: vi.fn().mockResolvedValue([]),
+  getUserDevices: vi.fn().mockResolvedValue([]),
+  getScoringWeights: vi.fn().mockResolvedValue({}),
+  updateScoringWeights: vi.fn(),
+  getScoringConfig: vi.fn().mockResolvedValue({ sameDeviceThreshold: 85, driftThreshold: 60 }),
+  updateScoringConfig: vi.fn(),
+  previewScoring: vi.fn().mockResolvedValue({ users: [], summary: {} }),
+  seedDemoUser: vi.fn(),
+  getSeedSummary: vi.fn().mockResolvedValue({ users: 0, devices: 0, fingerprints: 0 }),
+  clearSeedData: vi.fn(),
 }));
 
 describe('App', () => {
@@ -33,7 +43,6 @@ describe('App', () => {
 
     await user.click(screen.getByRole('button', { name: 'Tuning Console' }));
 
-    expect(screen.getByText('Tuning Console', { selector: 'h5' })).toBeInTheDocument();
-    expect(screen.getByText('Coming soon.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Tuning Console', level: 4 })).toBeInTheDocument();
   });
 });

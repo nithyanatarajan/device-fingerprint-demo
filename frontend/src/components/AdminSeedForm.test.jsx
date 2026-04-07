@@ -104,6 +104,31 @@ describe('AdminSeedForm', () => {
     expect(clearSeedData).not.toHaveBeenCalled();
   });
 
+  it('shows error when getSeedSummary fails', async () => {
+    const user = userEvent.setup();
+    getSeedSummary.mockRejectedValue(new Error('summary boom'));
+    render(<AdminSeedForm />);
+    await user.click(screen.getByRole('button', { name: 'Clear all demo data' }));
+    await waitFor(() => {
+      expect(screen.getByText('summary boom')).toBeInTheDocument();
+    });
+  });
+
+  it('shows error when clearSeedData fails', async () => {
+    const user = userEvent.setup();
+    getSeedSummary.mockResolvedValue({ users: 1, devices: 1, fingerprints: 1 });
+    clearSeedData.mockRejectedValue(new Error('clear boom'));
+    render(<AdminSeedForm />);
+    await user.click(screen.getByRole('button', { name: 'Clear all demo data' }));
+    await waitFor(() => {
+      expect(screen.getByText(/1 user\(s\)/)).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: 'Clear' }));
+    await waitFor(() => {
+      expect(screen.getByText('clear boom')).toBeInTheDocument();
+    });
+  });
+
   it('shows error if seed fails', async () => {
     const user = userEvent.setup();
     seedDemoUser.mockRejectedValue(new Error('seed boom'));

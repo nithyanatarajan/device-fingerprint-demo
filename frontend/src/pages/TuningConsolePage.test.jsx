@@ -1,18 +1,28 @@
-import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import TuningConsolePage from './TuningConsolePage';
 
 vi.mock('../services/api', () => ({
-  getScoringWeights: vi.fn().mockResolvedValue({}),
+  getScoringWeights: vi.fn(),
   updateScoringWeights: vi.fn(),
-  getScoringConfig: vi.fn().mockResolvedValue({ sameDeviceThreshold: 85, driftThreshold: 60 }),
+  getScoringConfig: vi.fn(),
   updateScoringConfig: vi.fn(),
   getUsers: vi.fn().mockResolvedValue([]),
   getUserDevices: vi.fn().mockResolvedValue([]),
   seedDemoUser: vi.fn(),
   getSeedSummary: vi.fn().mockResolvedValue({ users: 0, devices: 0, fingerprints: 0 }),
   clearSeedData: vi.fn(),
+  previewScoring: vi.fn(),
 }));
+
+import { getScoringWeights, getScoringConfig, previewScoring } from '../services/api';
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  getScoringWeights.mockResolvedValue({});
+  getScoringConfig.mockResolvedValue({ sameDeviceThreshold: 85, driftThreshold: 60 });
+  previewScoring.mockResolvedValue({ users: [], summary: {} });
+});
 
 describe('TuningConsolePage', () => {
   it('renders the page title', () => {
@@ -29,5 +39,56 @@ describe('TuningConsolePage', () => {
     expect(
       screen.getByRole('heading', { name: 'Live Preview Summary', level: 6 }),
     ).toBeInTheDocument();
+  });
+
+  it('shows "adjust a slider" hint when there is no preview yet', () => {
+    render(<TuningConsolePage />);
+    expect(screen.getByText('Adjust a slider to preview impact.')).toBeInTheDocument();
+  });
+
+  it('renders preview summary text when slider state triggers a preview', async () => {
+    getScoringWeights.mockResolvedValue({ canvas_hash: { weight: 90, enabled: true } });
+    previewScoring.mockResolvedValue({
+      users: [
+        {
+          userId: 'u1',
+          userName: 'alice',
+          devices: [
+            {
+              deviceId: 'd1',
+              deviceLabel: 'Chrome',
+              fingerprintCount: 2,
+              currentClassification: 'NEW_DEVICE',
+              proposedClassification: 'SAME_DEVICE',
+              currentScore: 0,
+              proposedScore: 90,
+              transition: 'PROMOTED',
+            },
+          ],
+        },
+      ],
+      summary: {
+        totalUsers: 1,
+        totalDevices: 1,
+        totalFingerprints: 2,
+        affectedDevices: 1,
+        promotedCount: 1,
+        demotedCount: 0,
+        unchangedCount: 0,
+      },
+    });
+
+    render(<TuningConsolePage />);
+
+    await waitFor(() => {
+      expect(previewScoring).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/1 user\(s\), 1 device\(s\), 2 fingerprint\(s\)\. Affected: 1\./),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('preview-summary-banner')).toBeInTheDocument();
   });
 });

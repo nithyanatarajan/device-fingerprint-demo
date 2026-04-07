@@ -122,6 +122,67 @@ describe('UserDevicesList', () => {
     });
   });
 
+  it('highlights rows by transition based on previewByDeviceId', async () => {
+    const user = userEvent.setup();
+    getUsers.mockResolvedValue([{ id: 'u1', name: 'alice', deviceCount: 2 }]);
+    getUserDevices.mockResolvedValue([
+      { id: 'd1', label: 'Chrome', visitCount: 1, machineSignature: 'a', publicIp: 'b' },
+      { id: 'd2', label: 'Firefox', visitCount: 2, machineSignature: 'c', publicIp: 'd' },
+    ]);
+    const previewByDeviceId = {
+      d1: {
+        deviceId: 'd1',
+        currentClassification: 'NEW_DEVICE',
+        proposedClassification: 'SAME_DEVICE',
+        transition: 'PROMOTED',
+      },
+      d2: {
+        deviceId: 'd2',
+        currentClassification: 'SAME_DEVICE',
+        proposedClassification: 'DRIFT_DETECTED',
+        transition: 'DEMOTED',
+      },
+    };
+
+    render(<UserDevicesList previewByDeviceId={previewByDeviceId} />);
+    await waitFor(() => expect(screen.getByText('alice')).toBeInTheDocument());
+    await user.click(screen.getByText('alice'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Chrome')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('device-row-d1')).toHaveAttribute('data-transition', 'PROMOTED');
+    expect(screen.getByTestId('device-row-d2')).toHaveAttribute('data-transition', 'DEMOTED');
+    // chips for old → new visible
+    expect(screen.getAllByText('NEW_DEVICE').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('SAME_DEVICE').length).toBeGreaterThan(0);
+    expect(screen.getByText('DRIFT_DETECTED')).toBeInTheDocument();
+  });
+
+  it('does not highlight UNCHANGED rows', async () => {
+    const user = userEvent.setup();
+    getUsers.mockResolvedValue([{ id: 'u1', name: 'alice', deviceCount: 1 }]);
+    getUserDevices.mockResolvedValue([
+      { id: 'd1', label: 'Chrome', visitCount: 1, machineSignature: 'a', publicIp: 'b' },
+    ]);
+    const previewByDeviceId = {
+      d1: {
+        deviceId: 'd1',
+        currentClassification: 'SAME_DEVICE',
+        proposedClassification: 'SAME_DEVICE',
+        transition: 'UNCHANGED',
+      },
+    };
+
+    render(<UserDevicesList previewByDeviceId={previewByDeviceId} />);
+    await waitFor(() => expect(screen.getByText('alice')).toBeInTheDocument());
+    await user.click(screen.getByText('alice'));
+    await waitFor(() => {
+      expect(screen.getByText('Chrome')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('device-row-d1')).toHaveAttribute('data-transition', 'UNCHANGED');
+  });
+
   it('shows device-fetch error', async () => {
     const user = userEvent.setup();
     getUsers.mockResolvedValue([{ id: 'u1', name: 'alice', deviceCount: 1 }]);

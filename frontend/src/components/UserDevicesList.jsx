@@ -10,6 +10,7 @@ import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
+import Chip from '@mui/material/Chip';
 import { getUsers, getUserDevices } from '../services/api';
 
 function formatLastSeen(value) {
@@ -17,14 +18,24 @@ function formatLastSeen(value) {
   return value;
 }
 
-function DeviceRow({ device }) {
+const TRANSITION_BG = {
+  PROMOTED: '#e8f5e9',
+  DEMOTED: '#ffebee',
+  UNCHANGED: 'transparent',
+};
+
+function DeviceRow({ device, previewDevice }) {
+  const transition = previewDevice?.transition || 'UNCHANGED';
   return (
     <Box
+      data-testid={`device-row-${device.id}`}
+      data-transition={transition}
       sx={{
         py: 1,
         px: 2,
         borderBottom: '1px solid',
         borderColor: 'divider',
+        backgroundColor: TRANSITION_BG[transition],
       }}
     >
       <Typography variant="body2" component="div">
@@ -53,11 +64,22 @@ function DeviceRow({ device }) {
           visits: {device.visitCount}
         </Typography>
       </Box>
+      {previewDevice && previewDevice.transition !== 'UNCHANGED' && (
+        <Box sx={{ display: 'flex', gap: 1, mt: 0.5, alignItems: 'center' }}>
+          <Chip size="small" label={previewDevice.currentClassification} variant="outlined" />
+          <Typography variant="caption">→</Typography>
+          <Chip
+            size="small"
+            label={previewDevice.proposedClassification}
+            color={previewDevice.transition === 'PROMOTED' ? 'success' : 'error'}
+          />
+        </Box>
+      )}
     </Box>
   );
 }
 
-export default function UserDevicesList({ refreshKey = 0 }) {
+export default function UserDevicesList({ refreshKey = 0, previewByDeviceId = {} }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -121,7 +143,11 @@ export default function UserDevicesList({ refreshKey = 0 }) {
                 {deviceError[user.id] && <Alert severity="error">{deviceError[user.id]}</Alert>}
                 {devicesByUser[user.id] &&
                   devicesByUser[user.id].map((device) => (
-                    <DeviceRow key={device.id} device={device} />
+                    <DeviceRow
+                      key={device.id}
+                      device={device}
+                      previewDevice={previewByDeviceId[device.id]}
+                    />
                   ))}
                 {devicesByUser[user.id] && devicesByUser[user.id].length === 0 && (
                   <Typography variant="caption" color="text.secondary">

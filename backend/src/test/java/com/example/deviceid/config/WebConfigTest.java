@@ -34,4 +34,39 @@ class WebConfigTest {
         .andExpect(status().isOk())
         .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
   }
+
+  @Test
+  void corsPreflightFromNgrokFreeAppShouldSucceed() throws Exception {
+    mockMvc
+        .perform(
+            options("/api/collect")
+                .header("Origin", "https://abc123.ngrok-free.app")
+                .header("Access-Control-Request-Method", "POST"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Access-Control-Allow-Origin", "https://abc123.ngrok-free.app"));
+  }
+
+  @Test
+  void corsPreflightFromNgrokFreeDevShouldSucceed() throws Exception {
+    mockMvc
+        .perform(
+            options("/api/collect")
+                .header("Origin", "https://bridger-ruddier-ammie.ngrok-free.dev")
+                .header("Access-Control-Request-Method", "POST"))
+        .andExpect(status().isOk())
+        .andExpect(
+            header()
+                .string(
+                    "Access-Control-Allow-Origin", "https://bridger-ruddier-ammie.ngrok-free.dev"));
+  }
+
+  @Test
+  void corsPreflightFromUnrelatedOriginShouldBeRejected() throws Exception {
+    mockMvc
+        .perform(
+            options("/api/collect")
+                .header("Origin", "https://evil.example.com")
+                .header("Access-Control-Request-Method", "POST"))
+        .andExpect(status().isForbidden());
+  }
 }

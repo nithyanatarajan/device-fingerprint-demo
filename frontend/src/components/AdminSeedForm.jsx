@@ -145,7 +145,7 @@ export default function AdminSeedForm({ onChanged }) {
           Curated demo scenario
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          One click seeds 5 users designed to sit at varied points on the score curve, so dragging
+          One click seeds 7 users designed to sit at varied points on the score curve, so dragging
           high-leverage sliders produces visible classification flips. Wipes existing demo data.
         </Typography>
         <Button

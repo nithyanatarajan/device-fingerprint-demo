@@ -84,16 +84,16 @@ class AdminSeedServiceTest {
   }
 
   @Test
-  void seedScenarioCreatesFiveCuratedUsersEachWithTwoFingerprintsOnOneDevice() {
+  void seedScenarioCreatesSevenCuratedUsersEachWithTwoFingerprintsOnOneDevice() {
     var outcomes = adminSeedService.seedScenario();
 
-    assertThat(outcomes).hasSize(5);
+    assertThat(outcomes).hasSize(7);
 
     AdminSeedSummary summary = adminSeedService.summary();
-    assertThat(summary.users()).isEqualTo(5);
+    assertThat(summary.users()).isEqualTo(7);
     // Each scenario produces 2 fingerprints that match into the same device, so users == devices.
-    assertThat(summary.devices()).isEqualTo(5);
-    assertThat(summary.fingerprints()).isEqualTo(10);
+    assertThat(summary.devices()).isEqualTo(7);
+    assertThat(summary.fingerprints()).isEqualTo(14);
   }
 
   @Test
@@ -104,9 +104,9 @@ class AdminSeedServiceTest {
     adminSeedService.seedScenario();
 
     AdminSeedSummary summary = adminSeedService.summary();
-    assertThat(summary.users()).isEqualTo(5);
+    assertThat(summary.users()).isEqualTo(7);
     // The pre-existing user is gone
-    assertThat(summary.users() == 5 && adminSeedService.summary().devices() == 5).isTrue();
+    assertThat(summary.users() == 7 && adminSeedService.summary().devices() == 7).isTrue();
   }
 
   @Test

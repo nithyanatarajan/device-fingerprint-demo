@@ -155,7 +155,7 @@ describe('AdminSeedForm', () => {
     render(<AdminSeedForm />);
     expect(screen.getByText('Curated demo scenario')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Seed demo scenario' })).toBeEnabled();
-    expect(screen.getByText(/5 users designed to sit at varied points/)).toBeInTheDocument();
+    expect(screen.getByText(/7 users designed to sit at varied points/)).toBeInTheDocument();
   });
 
   it('seeds the curated scenario and surfaces a snackbar', async () => {
@@ -166,6 +166,8 @@ describe('AdminSeedForm', () => {
       { userId: 'u3' },
       { userId: 'u4' },
       { userId: 'u5' },
+      { userId: 'u6' },
+      { userId: 'u7' },
     ]);
     const onChanged = vi.fn();
 
@@ -176,7 +178,7 @@ describe('AdminSeedForm', () => {
       expect(seedScenario).toHaveBeenCalled();
     });
     await waitFor(() => {
-      expect(screen.getByText(/Seeded scenario: 5 curated user/)).toBeInTheDocument();
+      expect(screen.getByText(/Seeded scenario: 7 curated user/)).toBeInTheDocument();
     });
     expect(onChanged).toHaveBeenCalled();
   });

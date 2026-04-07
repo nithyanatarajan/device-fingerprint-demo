@@ -100,18 +100,18 @@ class AdminSeedControllerTest {
   }
 
   @Test
-  void postSeedScenarioCreatesCuratedFiveUserDataset() throws Exception {
+  void postSeedScenarioCreatesCuratedSevenUserDataset() throws Exception {
     mockMvc
         .perform(post("/api/admin/seed/scenario"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$").isArray())
-        .andExpect(jsonPath("$.length()").value(5));
+        .andExpect(jsonPath("$.length()").value(7));
 
     mockMvc
         .perform(get("/api/admin/seed/summary"))
-        .andExpect(jsonPath("$.users").value(5))
-        .andExpect(jsonPath("$.devices").value(5))
-        .andExpect(jsonPath("$.fingerprints").value(10));
+        .andExpect(jsonPath("$.users").value(7))
+        .andExpect(jsonPath("$.devices").value(7))
+        .andExpect(jsonPath("$.fingerprints").value(14));
   }
 
   @Test

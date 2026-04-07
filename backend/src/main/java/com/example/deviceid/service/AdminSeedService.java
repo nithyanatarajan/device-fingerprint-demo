@@ -89,14 +89,23 @@ public class AdminSeedService {
       "Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0";
   private static final String DIFFERENT_CODEC_SUPPORT = "audio/mp4;codecs=mp4a.40.2";
   private static final String DIFFERENT_PLATFORM = "Win32";
+  // chrome-regular template ships with touchSupport=0; flipping to 5 simulates a touchscreen.
+  private static final int DIFFERENT_TOUCH_SUPPORT = 5;
 
   // Total default weight = 90+85+70+60+50+50+45+40+35+30+20+15+15+10+5 = 620
   // Approximate scores under default weights:
   //   stable        — all match           → 100.0  (SAME_DEVICE)
   //   canvas-drift  — canvas (90)         →  85.5  (SAME_DEVICE, on the cusp)
+  //   webgl-only    — webgl (85)          →  86.3  (SAME_DEVICE, on the cusp)
+  //   touch-only    — touch (70)          →  88.7  (SAME_DEVICE, on the cusp)
   //   cross-browser — canvas+webgl (175)  →  71.8  (DRIFT_DETECTED)
   //   os-update     — canvas+ua+codec     →  75.0  (DRIFT_DETECTED)
   //   major-drift   — canvas+webgl+plat   →  62.1  (DRIFT_DETECTED, just above drift threshold)
+  //
+  // The webgl-only and touch-only scenarios give webgl_renderer and touch_support their own
+  // dedicated lever devices — drag those individual weight sliders, or nudge the same-device
+  // threshold above 86.3 / 88.7, and watch the corresponding row flip from SAME_DEVICE to
+  // DRIFT_DETECTED. Without these, canvas_hash carried all the variation in the scenario set.
   private static final List<Scenario> SCENARIOS =
       List.of(
           new Scenario("demo-user-stable", req -> req),
@@ -117,6 +126,48 @@ public class AdminSeedService {
                       req.hardwareConcurrency(),
                       req.deviceMemory(),
                       req.touchSupport(),
+                      req.codecSupport(),
+                      req.dntEnabled(),
+                      req.cookieEnabled(),
+                      req.fontHash())),
+          new Scenario(
+              "demo-user-webgl-only",
+              req ->
+                  new CollectRequest(
+                      req.name(),
+                      req.canvasHash(),
+                      DIFFERENT_WEBGL_RENDERER,
+                      req.screenResolution(),
+                      req.colorDepth(),
+                      req.pixelRatio(),
+                      req.timezone(),
+                      req.locale(),
+                      req.platform(),
+                      req.userAgent(),
+                      req.hardwareConcurrency(),
+                      req.deviceMemory(),
+                      req.touchSupport(),
+                      req.codecSupport(),
+                      req.dntEnabled(),
+                      req.cookieEnabled(),
+                      req.fontHash())),
+          new Scenario(
+              "demo-user-touch-only",
+              req ->
+                  new CollectRequest(
+                      req.name(),
+                      req.canvasHash(),
+                      req.webglRenderer(),
+                      req.screenResolution(),
+                      req.colorDepth(),
+                      req.pixelRatio(),
+                      req.timezone(),
+                      req.locale(),
+                      req.platform(),
+                      req.userAgent(),
+                      req.hardwareConcurrency(),
+                      req.deviceMemory(),
+                      DIFFERENT_TOUCH_SUPPORT,
                       req.codecSupport(),
                       req.dntEnabled(),
                       req.cookieEnabled(),
@@ -186,11 +237,12 @@ public class AdminSeedService {
                       req.fontHash())));
 
   /**
-   * Wipes existing demo data and seeds a curated scenario of 5 users designed to sit at varied
+   * Wipes existing demo data and seeds a curated scenario of 7 users designed to sit at varied
    * points on the score curve. Each user has two fingerprints on one device so the preview service
-   * can score them, and dragging high-leverage sliders (canvas_hash, webgl_renderer, platform)
-   * produces visible classification flips. Returns the {@link CollectResponse} of each second visit
-   * (the scoring outcome the audience watches happen).
+   * can score them, and dragging high-leverage sliders (canvas_hash, webgl_renderer, touch_support,
+   * platform) or the same-device / drift thresholds produces visible classification flips. Returns
+   * the {@link CollectResponse} of each second visit (the scoring outcome the audience watches
+   * happen).
    */
   public List<CollectResponse> seedScenario() {
     clearAll();

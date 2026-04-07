@@ -248,87 +248,114 @@ Recognizes the same **hardware** across different browsers for the **same user**
 
 **Design rationale, signal exclusion reasoning, false-positive analysis, and the full scenario reference are in [`docs/how-it-works.md`](docs/how-it-works.md).**
 
-### Phase 3: Scoring Engine + Tuning Console
+### Phase 3: Tuning Console + Ripple Effect + Admin Seed
 
-**Scoring Engine (backend):**
-- Weighted similarity scoring as described in the Scoring Engine section
-- Per-signal comparison with partial match logic
-- User-scoped matching
-- Configurable weights and thresholds
+The previous Phase 3 (Tuning Console) and Phase 4 (Ripple Effect) are merged into a single phase because they ship together — sliders without live preview are a flat demo, and the live preview is the headline moment. Admin Seed is folded in alongside because the Tuning Console and Ripple Effect both need populated data to be meaningful.
 
-**Tuning Console (frontend — admin page):**
+**Tuning Console (frontend admin page at `/admin`):**
 - Signal weight sliders (0-100 per signal) with clear indication these are relative
 - Enable/disable toggle per signal
-- Same-device threshold slider
-- Drift threshold slider
-- Per-user device list: select a user, see their devices with match history
-- Or: all users with device counts, click into a user to see their devices
-- Save configuration -> persists and affects all future scoring
+- Same-device threshold slider, drift threshold slider, with the constraint same-device ≥ drift
+- Reset to defaults button
+- Per-user device list: GET `/api/users`, expand a user → GET `/api/users/{id}/devices`. Each device row shows label, machine signature (truncated), public IP, last seen, visit count
+- Save configuration → persists via `PUT /api/scoring/weights` and `PUT /api/scoring/config`
 
-**APIs:**
+**Ripple Effect (live preview without persisting):**
+- As the admin drags any weight or threshold slider, the frontend sends the proposed config to `POST /api/scoring/preview` (debounced 300ms)
+- Backend re-runs Phase 1 scoring for every stored fingerprint per user with the proposed config and returns a diff: per-user/device, old classification vs new classification
+- UI highlights affected rows in the user/device list: green for promoted (DRIFT → SAME_DEVICE), red for demoted (SAME_DEVICE → DRIFT or DRIFT → NEW_DEVICE), amber for in-band shifts
+- Summary bar: *"This change affects N users, M fingerprints. X devices would be split, Y would be merged."*
+- Preview never persists; only Save commits the change
+
+**Admin Seed (frontend form + backend endpoints):**
+- Demo Data section at the top of the Tuning Console with a 4-input form: `userName` (defaults to `demo-user-alpha`, server enforces the `demo-user-` prefix), `browser` (Chrome / Firefox / Safari), `vpn` (toggle), `incognito` (toggle)
+- Submit creates one synthetic fingerprint by calling `POST /api/admin/seed`. Backend builds a `CollectRequest` from canonical templates per (browser × incognito) using the real captured payloads from `docs/demo/`, picks the public IP based on the VPN flag, and calls `CollectionService.collect()` internally. This means seeded data flows through the exact same scoring/matching code path as real visits and is indistinguishable in the database.
+- The form's "Last result" shows the live `CollectResponse` with the same chips and panel state the collection page would show, so the audience can watch each seeded visit produce its outcome in real time.
+- Idempotent: the same `(userName, browser, incognito)` combination twice updates the existing fingerprint instead of duplicating.
+- `Clear all demo data` button opens an MUI confirmation Dialog (not a browser `confirm()`). Pre-populated with the count from `GET /api/admin/seed/summary`. On confirm, calls `DELETE /api/admin/seed` which cascading-deletes every user whose name starts with `demo-user-` along with their devices and fingerprints.
+- The `demo-user-` prefix is enforced server-side on all three endpoints. There is no way for a typo to accidentally affect real users.
+
+**APIs added in Phase 3:**
+- `POST /api/scoring/preview` — accepts proposed weights + thresholds, returns re-scored before/after classifications per user. Does not persist.
+- `GET /api/users/{id}` — user detail
+- `POST /api/admin/seed` — body `{ userName, browser, vpn, incognito }`, creates one synthetic fingerprint via `CollectionService.collect()`, returns the resulting `CollectResponse`
+- `DELETE /api/admin/seed` — cascades to delete all `demo-user-*` users + their devices + their fingerprints, returns counts
+- `GET /api/admin/seed/summary` — returns `{ users, devices, fingerprints }` counts of current `demo-user-*` data, used by the frontend to populate the confirmation dialog
+
+**Already shipped in Phase 1, reused here:**
 - `GET /api/users` — list all users with device counts
-- `GET /api/users/{id}` — user detail with devices
-- `GET /api/scoring/weights` — current signal weights
-- `PUT /api/scoring/weights` — update weights
-- `GET /api/scoring/config` — thresholds
-- `PUT /api/scoring/config` — update thresholds
+- `GET /api/users/{userId}/devices` — list devices for a user
+- `GET /api/scoring/weights`, `PUT /api/scoring/weights`
+- `GET /api/scoring/config`, `PUT /api/scoring/config`
 
-### Phase 4: Ripple Effect
+### Phase 4: Device Investigation *(deferred)*
 
-When an admin adjusts weights or thresholds in the tuning console, the UI shows how the change impacts device recognition across all users **before saving**.
-
-**How it works:**
-- Admin moves a slider -> frontend sends proposed config to preview endpoint (debounced)
-- Backend re-runs matching for every fingerprint ever collected, scoped per user, using proposed weights/thresholds
-- Returns a diff: for each affected fingerprint, old classification vs. new classification
-- UI highlights changes with summary
-
-**UI treatment:**
-- As you drag a slider, the results update (debounced, not on every pixel)
-- Affected entries highlighted: green = promoted to same device, red = demoted, amber = shifted to drift
-- Summary bar: "This change affects N users, M fingerprints. X devices would be split, Y would be merged."
-
-**API:**
-- `POST /api/scoring/preview` — accepts proposed weights + thresholds, returns re-scored results with before/after classifications per user
-
-### Phase 5: Device Investigation (stretch)
-
-Drill into a specific user's device for full explainability.
+**Real phase, real demo value, deliberately deferred for time.** Drills into a specific user's device for full explainability — answers *"why did the system reach this conclusion?"* using existing data, not new collection.
 
 **What it shows:**
 - Full signal breakdown for the device's latest fingerprint
 - Visit history timeline — every time this device was seen, with timestamps
-- Drift history — what signals changed between visits (e.g., "user_agent changed on visit 3, likely browser update")
-- Match explanation — "this device was identified because canvas_hash (weight 90) and webgl_renderer (weight 85) matched, despite user_agent (weight 30) changing"
+- Per-signal drift history across visits (e.g., *"user_agent changed on visit 3: Chrome/145 → Chrome/146"*)
+- Match explanation — *"this device was identified because canvas_hash (weight 90, score 1.0) and webgl_renderer (weight 85, score 1.0) matched, despite user_agent (weight 30, score 0.0) changing — composite 78%"*
 
 **UI:**
-- Select user -> see their devices -> click a device -> investigation view
-- Signal-by-signal comparison across visits (table with green/red/amber cells)
-- "Why was this matched?" summary — shows which signals carried the score
+- From the Tuning Console's user/device list, click a device → opens an investigation view
+- Signal-by-signal comparison table across visits (green/red/amber cells)
+- "Why was this matched?" summary panel
 
 **APIs:**
 - `GET /api/users/{userId}/devices/{deviceId}` — full device detail with fingerprint history
-- `GET /api/users/{userId}/devices/{deviceId}/drift` — signal changes across visits
+- `GET /api/users/{userId}/devices/{deviceId}/drift` — per-signal changes across visits
+
+### Phase 5: Signal Expansion *(deferred)*
+
+**Real phase, real value, deliberately deferred.** Pushes precision further by adding entropy sources beyond `fontHash`.
+
+**Candidates** (in order of estimated ROI):
+- **WebGL parameter dump** — `MAX_TEXTURE_SIZE`, extensions list, ANGLE backend hints. ~8–12 bits of entropy, mostly stable across browsers on the same GPU.
+- **Audio context FFT hash** — short FFT, hash the result. ~5–10 bits, slight floating-point variance per CPU.
+- **Expanded font probe list** — from ~150 to ~500 entries, including region-specific fonts (CJK, Arabic, etc.).
+- **Font detection via canvas metrics** — fallback for browsers that restrict `document.fonts.check()`.
+
+Each addition requires cross-browser verification (Chrome / Firefox / Safari must produce identical values on the same hardware, like we did for `fontHash`). Without that discipline, an added signal silently breaks Phase 2.
+
+**Why deferred:** signal expansion is a "numbers go up" improvement — hard to demo viscerally because you need hardware collisions to make the before/after visible. Phase 4 (Investigation) has higher demo value per hour invested.
+
+### Out of scope for this project
+
+Things a production fingerprinting product would need but this demo deliberately does not include. Listed for completeness so they're not forgotten:
+
+- **Authentication / authorization** — the Tuning Console and admin seed endpoints have zero access control by design. No login flow, no roles.
+- **Rate limiting on `/api/collect`** — abuse prevention is not in scope.
+- **Data retention / cleanup** — fingerprints accumulate forever. No scheduled aging job.
+- **External service integrations** — IP reputation, VPN ASN lists, bot detection, fraud scoring.
+- **Multi-tenancy** — single application, single database.
+- **Observability** — beyond standard Spring Boot defaults. No Prometheus, no tracing, no structured logs.
+
+If any of these became real requirements, they would each be a sizable phase in their own right and would likely deserve a separate codebase rather than being grafted onto this one.
 
 ---
 
 ## Demo Script
 
-1. **"Nithya" logs in on laptop** -> "New user, new device registered for Nithya" — show fingerprint breakdown
-2. **"Nithya" refreshes** -> "Welcome back Nithya, recognized your laptop (98%)"
-3. **"Nithya" in incognito** -> "Recognized your laptop (91%)" — canvas/WebGL still match, cookie differs
-4. **"Nithya" on phone** -> "New device for Nithya" — clearly different signals
-5. **Open tuning console** -> See Nithya's device profile (2 devices, multiple visits)
-6. **Drag canvas_hash weight to 0** -> Ripple: "Nithya's incognito visit drops from 91% to 68% — now DRIFT instead of SAME_DEVICE"
-7. **Restore weights** -> "This is the kind of tuning a device profiling team does — and we built it rapidly with AI"
+A polished ~6–8 minute live demo arc covering Phase 1, Phase 2, and Phase 3. The full step-by-step talking-point version lives in [`docs/demo/scenarios.md`](docs/demo/scenarios.md) (with captured payloads + screenshots).
+
+1. **First visit, baseline.** Open the ngrok demo URL in Chrome, identify as `nithya`. Both chips show the new state: `[NEW_DEVICE]` `[NO_MACHINE_MATCH]`. Show the signal breakdown.
+2. **Cross-browser recognition.** Open Firefox, identify as `nithya` again. Phase 1 chip shows `NEW_DEVICE` (or `DRIFT_DETECTED`), Phase 2 chip flips to `[SAME_MACHINE]` (green) and the panel lists the Chrome session. Repeat in Safari — panel now lists both Chrome and Firefox.
+3. **VPN on — IP-tier transition.** With Chrome already registered, turn the VPN on, refresh, identify again. Phase 1 still says `SAME_DEVICE`. Phase 2 chip flips from `SAME_MACHINE` (green) to `MATCHING_HARDWARE` (amber), panel header changes to *"Matching hardware"* with the *"could be the same machine on a different Wi-Fi or VPN"* caveat. **VPN off** restores the green state.
+4. **Privacy: different user name.** Identify as `alice` from the same Chrome window. New user, new device, no Same Machine panel. The system never surfaces another user's data even though the hardware would match. Identify back as `nithya` and confirm alice doesn't appear on her side either — bidirectional isolation.
+5. **Two voices disagreeing.** Open Chrome Incognito, identify as `nithya`. Phase 1 likely says `DRIFT_DETECTED` (canvas / cookie state changed). Phase 2 still says `SAME_MACHINE` because hardware is unchanged. The audience sees the two mechanisms reach different conclusions and understands why each is right from its own perspective.
+6. **Open the Tuning Console.** Show the user/device list populated by the previous steps (and seed any extra demo data via the Demo Data form if needed — pick a browser, toggle VPN/incognito, click Seed, watch the row appear with its match result inline).
+7. **Ripple Effect — drag a slider.** Pick `canvas_hash`, drag the weight from 90 down toward 0. As you drag, the user list updates live with highlighted rows showing flipped classifications. Summary bar updates: *"This change affects N users, M fingerprints."* Stop at a point where the incognito/Firefox visits flip from DRIFT to SAME_DEVICE. The audience watches scoring decisions change in real time.
+8. **Restore weights and Save.** Reset to defaults, close the loop with a sentence about how a real device profiling team uses this kind of tool to iterate against historical data — and how the entire system was built rapidly with AI assistance.
 
 ---
 
 ## Implementation Notes
 
 - Spring Boot 4 with Java 25 (records, pattern matching, virtual threads)
-- H2 database (zero setup, embedded)
+- H2 database (zero setup, embedded). Default in-memory; opt into file-mode persistence via `DATABASE_URL` and `DDL_AUTO` env vars (see README) for demo prep that survives backend restarts.
 - React 19.2.4 with Material UI
 - No auth (it's a demo)
-- Synthetic data seeder: generates additional users and devices AFTER Phase 1 is working, to simulate a populated system for the admin portal demo. Based on real signal patterns from actual collection.
+- Synthetic data seeder lives in Phase 3 as the Admin Seed form inside the Tuning Console. Calls `CollectionService.collect()` internally with canonical templates from real captured payloads, so seeded data is indistinguishable from real visits in the database. Enforces a `demo-user-` prefix server-side so synthetic and real data never collide.
 - No SSE/websockets — simple request/response. Dashboard refreshes on navigation.

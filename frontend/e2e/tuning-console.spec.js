@@ -96,11 +96,13 @@ test.describe('Tuning Console', () => {
     await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
     await openDemoDataAccordion(page);
 
-    await page.getByLabel('User name').fill('demo-user-e2e-signature');
+    await page.getByLabel('User name').fill('e2e-signature');
     await page.getByRole('button', { name: 'Seed' }).click();
 
     // User appears in the list
-    await expect(page.getByText('demo-user-e2e-signature')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('user-section-demo-user-e2e-signature')).toBeVisible({
+      timeout: 10_000,
+    });
     // Last result chip is rendered
     await expect(page.getByText('Last result')).toBeVisible();
 
@@ -123,32 +125,36 @@ test.describe('Tuning Console', () => {
     await openDemoDataAccordion(page);
 
     // First: Chrome regular
-    await page.getByLabel('User name').fill('demo-user-e2e-chrome');
+    await page.getByLabel('User name').fill('e2e-chrome');
     await page.getByRole('button', { name: 'Seed' }).click();
-    await expect(page.getByText('demo-user-e2e-chrome')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('user-section-demo-user-e2e-chrome')).toBeVisible({
+      timeout: 10_000,
+    });
 
     // Second: Firefox incognito
-    await page.getByLabel('User name').fill('demo-user-e2e-firefox');
+    await page.getByLabel('User name').fill('e2e-firefox');
     // Open the Browser select and pick Firefox
     await page.getByLabel('Browser').click();
     await page.getByRole('option', { name: 'Firefox' }).click();
     await page.getByTestId('seed-incognito-switch').click();
     await page.getByRole('button', { name: 'Seed' }).click();
 
-    await expect(page.getByText('demo-user-e2e-firefox')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('user-section-demo-user-e2e-firefox')).toBeVisible({
+      timeout: 10_000,
+    });
     // Both users still visible
-    await expect(page.getByText('demo-user-e2e-chrome')).toBeVisible();
+    await expect(page.getByTestId('user-section-demo-user-e2e-chrome')).toBeVisible();
   });
 
-  test('invalid user name disables Seed and surfaces helper text', async ({ page }) => {
+  test('empty user name suffix disables Seed and surfaces helper text', async ({ page }) => {
     await page.goto('/admin');
     await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
     await openDemoDataAccordion(page);
 
     const input = page.getByLabel('User name');
-    await input.fill('nithya');
+    await input.fill('');
     await expect(page.getByRole('button', { name: 'Seed' })).toBeDisabled();
-    await expect(page.getByText('must start with demo-user-')).toBeVisible();
+    await expect(page.getByText('Lowercase letters, digits, and hyphens only')).toBeVisible();
   });
 
   test('clear-all dialog Cancel preserves data', async ({ page }) => {
@@ -156,9 +162,11 @@ test.describe('Tuning Console', () => {
     await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
     await openDemoDataAccordion(page);
 
-    await page.getByLabel('User name').fill('demo-user-e2e-cancel');
+    await page.getByLabel('User name').fill('e2e-cancel');
     await page.getByRole('button', { name: 'Seed' }).click();
-    await expect(page.getByText('demo-user-e2e-cancel')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('user-section-demo-user-e2e-cancel')).toBeVisible({
+      timeout: 10_000,
+    });
 
     await page.getByRole('button', { name: 'Clear all demo data' }).click();
     await expect(page.getByRole('heading', { name: 'Clear all demo data?' })).toBeVisible();
@@ -167,7 +175,7 @@ test.describe('Tuning Console', () => {
     await page.getByRole('button', { name: 'Cancel' }).click();
     // Dialog closes, user still there
     await expect(page.getByRole('heading', { name: 'Clear all demo data?' })).toHaveCount(0);
-    await expect(page.getByText('demo-user-e2e-cancel')).toBeVisible();
+    await expect(page.getByTestId('user-section-demo-user-e2e-cancel')).toBeVisible();
   });
 
   test('clear-all dialog Confirm empties the demo data', async ({ page }) => {
@@ -175,16 +183,20 @@ test.describe('Tuning Console', () => {
     await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
     await openDemoDataAccordion(page);
 
-    await page.getByLabel('User name').fill('demo-user-e2e-confirm');
+    await page.getByLabel('User name').fill('e2e-confirm');
     await page.getByRole('button', { name: 'Seed' }).click();
-    await expect(page.getByText('demo-user-e2e-confirm')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('user-section-demo-user-e2e-confirm')).toBeVisible({
+      timeout: 10_000,
+    });
 
     await page.getByRole('button', { name: 'Clear all demo data' }).click();
     await expect(page.getByRole('heading', { name: 'Clear all demo data?' })).toBeVisible();
     await page.getByRole('button', { name: 'Clear', exact: true }).click();
 
     // Seeded user is gone
-    await expect(page.getByText('demo-user-e2e-confirm')).toHaveCount(0, { timeout: 10_000 });
+    await expect(page.getByTestId('user-section-demo-user-e2e-confirm')).toHaveCount(0, {
+      timeout: 10_000,
+    });
     // Snackbar surfaces the cleared counts (>=1 user). Tolerant of any other
     // demo data that other test files may have left behind.
     await expect(page.getByText(/Cleared: \d+ user\(s\)/)).toBeVisible();
@@ -197,9 +209,11 @@ test.describe('Tuning Console', () => {
 
     // Seed two visits for the same user so the device has >=2 fingerprints
     // (the preview endpoint only reclassifies devices with >=2 fingerprints).
-    await page.getByLabel('User name').fill('demo-user-e2e-ripple');
+    await page.getByLabel('User name').fill('e2e-ripple');
     await page.getByRole('button', { name: 'Seed' }).click();
-    await expect(page.getByText('demo-user-e2e-ripple')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('user-section-demo-user-e2e-ripple')).toBeVisible({
+      timeout: 10_000,
+    });
     // Toggle incognito to force a second fingerprint with different canvas
     await page.getByTestId('seed-incognito-switch').click();
     await page.getByRole('button', { name: 'Seed' }).click();

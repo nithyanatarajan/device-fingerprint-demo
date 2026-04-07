@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import InputAdornment from '@mui/material/InputAdornment';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import InputLabel from '@mui/material/InputLabel';
@@ -41,8 +42,11 @@ function machineMatchVerdict(machineMatch) {
   return 'NO_MACHINE_MATCH';
 }
 
+const USER_PREFIX = 'demo-user-';
+const VALID_SUFFIX = /^[a-z0-9-]+$/;
+
 export default function AdminSeedForm({ onChanged }) {
-  const [userName, setUserName] = useState('demo-user-alpha');
+  const [nameSuffix, setNameSuffix] = useState('alpha');
   const [browser, setBrowser] = useState('chrome');
   const [vpn, setVpn] = useState(false);
   const [incognito, setIncognito] = useState(false);
@@ -55,13 +59,18 @@ export default function AdminSeedForm({ onChanged }) {
   const [clearing, setClearing] = useState(false);
   const [snackbar, setSnackbar] = useState(null);
 
-  const validName = userName.startsWith('demo-user-') && userName.length > 'demo-user-'.length;
+  const validName = nameSuffix.length > 0 && VALID_SUFFIX.test(nameSuffix);
 
   const handleSeed = async () => {
     setSeeding(true);
     setError(null);
     try {
-      const result = await seedDemoUser({ userName, browser, vpn, incognito });
+      const result = await seedDemoUser({
+        userName: USER_PREFIX + nameSuffix,
+        browser,
+        vpn,
+        incognito,
+      });
       setLastResult(result);
       if (onChanged) onChanged();
     } catch (err) {
@@ -115,11 +124,20 @@ export default function AdminSeedForm({ onChanged }) {
       <Stack spacing={2}>
         <TextField
           label="User name"
-          value={userName}
-          onChange={(e) => setUserName(e.target.value)}
-          helperText="must start with demo-user-"
+          value={nameSuffix}
+          onChange={(e) => setNameSuffix(e.target.value.trim().toLowerCase())}
+          helperText={
+            validName
+              ? `Will be created as ${USER_PREFIX}${nameSuffix}`
+              : 'Lowercase letters, digits, and hyphens only'
+          }
           error={!validName}
           size="small"
+          slotProps={{
+            input: {
+              startAdornment: <InputAdornment position="start">{USER_PREFIX}</InputAdornment>,
+            },
+          }}
         />
         <FormControl size="small">
           <InputLabel id="browser-label">Browser</InputLabel>

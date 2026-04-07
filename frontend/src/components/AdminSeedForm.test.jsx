@@ -16,19 +16,30 @@ beforeEach(() => {
 });
 
 describe('AdminSeedForm', () => {
-  it('renders fields with defaults and helper text', () => {
+  it('renders the suffix-only input with the prefix as a fixed adornment', () => {
     render(<AdminSeedForm />);
-    expect(screen.getByLabelText('User name')).toHaveValue('demo-user-alpha');
-    expect(screen.getByText('must start with demo-user-')).toBeInTheDocument();
+    // The input contains only the suffix; the prefix is a non-editable adornment.
+    expect(screen.getByLabelText('User name')).toHaveValue('alpha');
+    expect(screen.getByText('demo-user-')).toBeInTheDocument();
+    expect(screen.getByText('Will be created as demo-user-alpha')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Seed' })).toBeEnabled();
   });
 
-  it('disables Seed button when name does not start with demo-user-', async () => {
+  it('disables Seed button when suffix is empty', async () => {
     const user = userEvent.setup();
     render(<AdminSeedForm />);
     const input = screen.getByLabelText('User name');
     await user.clear(input);
-    await user.type(input, 'bob');
+    expect(screen.getByRole('button', { name: 'Seed' })).toBeDisabled();
+    expect(screen.getByText('Lowercase letters, digits, and hyphens only')).toBeInTheDocument();
+  });
+
+  it('disables Seed button when suffix has invalid characters', async () => {
+    const user = userEvent.setup();
+    render(<AdminSeedForm />);
+    const input = screen.getByLabelText('User name');
+    await user.clear(input);
+    await user.type(input, 'bob smith!');
     expect(screen.getByRole('button', { name: 'Seed' })).toBeDisabled();
   });
 

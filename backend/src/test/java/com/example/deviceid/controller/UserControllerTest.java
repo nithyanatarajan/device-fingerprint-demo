@@ -74,6 +74,62 @@ class UserControllerTest {
         .andExpect(status().isNotFound());
   }
 
+  @Test
+  void getUserDevicesShouldIncludeMachineSignatureAndPublicIp() throws Exception {
+    MvcResult result =
+        mockMvc
+            .perform(
+                post("/api/collect")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("X-Forwarded-For", "203.0.113.42")
+                    .content(collectJson("testuser")))
+            .andReturn();
+
+    String responseBody = result.getResponse().getContentAsString();
+    String userId =
+        responseBody.substring(
+            responseBody.indexOf("\"userId\":\"") + 10,
+            responseBody.indexOf("\"", responseBody.indexOf("\"userId\":\"") + 10));
+
+    mockMvc
+        .perform(get("/api/users/" + userId + "/devices"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].machineSignature").isNotEmpty())
+        .andExpect(jsonPath("$[0].publicIp").value("203.0.113.42"));
+  }
+
+  @Test
+  void getUserDetailShouldReturnUserMetadata() throws Exception {
+    MvcResult result =
+        mockMvc
+            .perform(
+                post("/api/collect")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(collectJson("testuser")))
+            .andReturn();
+
+    String responseBody = result.getResponse().getContentAsString();
+    String userId =
+        responseBody.substring(
+            responseBody.indexOf("\"userId\":\"") + 10,
+            responseBody.indexOf("\"", responseBody.indexOf("\"userId\":\"") + 10));
+
+    mockMvc
+        .perform(get("/api/users/" + userId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value(userId))
+        .andExpect(jsonPath("$.name").value("testuser"))
+        .andExpect(jsonPath("$.deviceCount").value(1))
+        .andExpect(jsonPath("$.createdAt").isNotEmpty());
+  }
+
+  @Test
+  void getUserDetailForUnknownUserShouldReturn404() throws Exception {
+    mockMvc
+        .perform(get("/api/users/00000000-0000-0000-0000-000000000000"))
+        .andExpect(status().isNotFound());
+  }
+
   private String collectJson(String name) {
     return """
         {

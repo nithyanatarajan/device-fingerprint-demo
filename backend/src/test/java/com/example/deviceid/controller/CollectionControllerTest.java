@@ -67,7 +67,7 @@ class CollectionControllerTest {
                     })
                 .content(collectRequestJson("userB")))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.machineMatch.matches[0].userName").value("usera"));
+        .andExpect(jsonPath("$.machineMatch.strongMatches[0].userName").value("usera"));
   }
 
   @Test
@@ -87,7 +87,7 @@ class CollectionControllerTest {
                 .header("X-Forwarded-For", "203.0.113.77, 10.0.0.1, 10.0.0.2")
                 .content(collectRequestJson("userB")))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.machineMatch.matches[0].userName").value("usera"));
+        .andExpect(jsonPath("$.machineMatch.strongMatches[0].userName").value("usera"));
   }
 
   @Test
@@ -116,7 +116,7 @@ class CollectionControllerTest {
                     })
                 .content(collectRequestJson("userB")))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.machineMatch.matches[0].userName").value("usera"));
+        .andExpect(jsonPath("$.machineMatch.strongMatches[0].userName").value("usera"));
   }
 
   @Test

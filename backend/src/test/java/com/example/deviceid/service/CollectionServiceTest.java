@@ -58,18 +58,33 @@ class CollectionServiceTest {
     CollectResponse response = collectionService.collect(createRequest("testuser"), "203.0.113.10");
 
     assertThat(response.machineMatch()).isNotNull();
-    assertThat(response.machineMatch().matches()).isEmpty();
+    assertThat(response.machineMatch().strongMatches()).isEmpty();
+    assertThat(response.machineMatch().possibleMatches()).isEmpty();
   }
 
   @Test
-  void crossUserSameMachineShouldSurfacePriorIdentity() {
+  void crossUserSameMachineShouldSurfacePriorIdentityAsStrongMatch() {
     CollectResponse first = collectionService.collect(createRequest("userA"), "203.0.113.10");
     CollectResponse second = collectionService.collect(createRequest("userB"), "203.0.113.10");
 
     assertThat(second.machineMatch()).isNotNull();
-    assertThat(second.machineMatch().matches()).hasSize(1);
-    assertThat(second.machineMatch().matches().get(0).deviceId()).isEqualTo(first.deviceId());
-    assertThat(second.machineMatch().matches().get(0).userId()).isEqualTo(first.userId());
+    assertThat(second.machineMatch().possibleMatches()).isEmpty();
+    assertThat(second.machineMatch().strongMatches()).hasSize(1);
+    assertThat(second.machineMatch().strongMatches().get(0).deviceId()).isEqualTo(first.deviceId());
+    assertThat(second.machineMatch().strongMatches().get(0).userId()).isEqualTo(first.userId());
+  }
+
+  @Test
+  void crossUserSameMachineDifferentNetworkShouldSurfaceAsPossibleMatch() {
+    CollectResponse first = collectionService.collect(createRequest("userA"), "203.0.113.10");
+    CollectResponse second = collectionService.collect(createRequest("userB"), "198.51.100.20");
+
+    assertThat(second.machineMatch()).isNotNull();
+    assertThat(second.machineMatch().strongMatches()).isEmpty();
+    assertThat(second.machineMatch().possibleMatches()).hasSize(1);
+    assertThat(second.machineMatch().possibleMatches().get(0).deviceId())
+        .isEqualTo(first.deviceId());
+    assertThat(second.machineMatch().possibleMatches().get(0).userId()).isEqualTo(first.userId());
   }
 
   @Test

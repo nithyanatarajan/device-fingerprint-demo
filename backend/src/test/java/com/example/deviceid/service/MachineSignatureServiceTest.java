@@ -36,10 +36,28 @@ class MachineSignatureServiceTest {
   }
 
   @Test
+  void timezoneDoesNotAffectHash() {
+    DeviceFingerprint a = sampleFingerprint();
+    DeviceFingerprint b = sampleFingerprint();
+    b.setTimezone("Europe/London");
+
+    assertThat(service.computeSignature(a)).isEqualTo(service.computeSignature(b));
+  }
+
+  @Test
   void differentHardwareProducesDifferentHash() {
     DeviceFingerprint a = sampleFingerprint();
     DeviceFingerprint b = sampleFingerprint();
     b.setPlatform("Win32");
+
+    assertThat(service.computeSignature(a)).isNotEqualTo(service.computeSignature(b));
+  }
+
+  @Test
+  void differentScreenResolutionProducesDifferentHash() {
+    DeviceFingerprint a = sampleFingerprint();
+    DeviceFingerprint b = sampleFingerprint();
+    b.setScreenResolution("2560x1440");
 
     assertThat(service.computeSignature(a)).isNotEqualTo(service.computeSignature(b));
   }

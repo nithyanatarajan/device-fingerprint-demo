@@ -9,9 +9,14 @@ import org.springframework.stereotype.Component;
 /**
  * Computes a stable, browser-independent machine signature over hardware-only signals.
  *
+ * <p>The hash spans 6 hardware signals: platform, screenResolution, colorDepth,
+ * hardwareConcurrency, deviceMemory, touchSupport.
+ *
  * <p>Browser-specific signals (canvas, webgl, userAgent, codec, locale, pixelRatio, dntEnabled,
  * cookieEnabled) are deliberately excluded so the signature remains stable across different
- * browsers running on the same machine.
+ * browsers running on the same machine. {@code timezone} is also excluded — it is an OS setting
+ * that changes when the user travels or on DST transitions, and including it would silently break
+ * machine recognition for a user crossing timezones on the same laptop.
  */
 @Component
 public class MachineSignatureService {
@@ -19,7 +24,6 @@ public class MachineSignatureService {
   /** Computes a SHA-256 hex digest over the hardware signals of the given fingerprint. */
   public String computeSignature(DeviceFingerprint fp) {
     StringBuilder sb = new StringBuilder();
-    sb.append(serialize(fp.getTimezone())).append('|');
     sb.append(serialize(fp.getPlatform())).append('|');
     sb.append(serialize(fp.getScreenResolution())).append('|');
     sb.append(serialize(fp.getColorDepth())).append('|');

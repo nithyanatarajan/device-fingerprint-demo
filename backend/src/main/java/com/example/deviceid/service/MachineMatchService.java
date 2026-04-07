@@ -16,13 +16,12 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 /**
- * Tiered cross-browser machine matching.
+ * Tiered, per-user, cross-browser machine matching.
  *
  * <p>Two-tier model:
  *
  * <ul>
- *   <li><b>Strong match</b>: hardware signature + timezone + locale + publicIp all align. Near-zero
- *       false positives outside the household-collision edge case.
+ *   <li><b>Strong match</b>: hardware signature + timezone + locale + publicIp all align.
  *   <li><b>Possible match</b>: hardware signature + timezone + locale align but publicIp differs
  *       (VPN, café, mobile hotspot, roamed Wi-Fi). Surfaced with an explicit caveat in the UI.
  * </ul>
@@ -30,8 +29,14 @@ import org.springframework.stereotype.Service;
  * <p>Timezone and locale are hard co-match gates: a mismatch suppresses the candidate from both
  * lists. publicIp is a soft gate that only demotes a candidate from strong to possible.
  *
- * <p>Self-matches (the current device's own prior fingerprints) are excluded. Cross-user matches
- * are intentional — a user re-registering on the same machine should surface the prior identity.
+ * <p><b>Per-user scoping (privacy-first):</b> only fingerprints belonging to the same user as the
+ * current visit are considered. Cross-user matching is never performed — we never surface another
+ * user's data, even if their hardware happens to match.
+ *
+ * <p><b>Self-exclusion is per-fingerprint, not per-device.</b> Only the just-saved fingerprint is
+ * excluded from the match list. Other fingerprints on the same device row as the current visit
+ * (e.g., the user's prior visits before Phase 1's drift logic merged them into a single device) are
+ * included — Phase 2 speaks regardless of how Phase 1 categorized them.
  */
 @Service
 public class MachineMatchService {
@@ -49,19 +54,27 @@ public class MachineMatchService {
       return new MachineMatchResult(List.of(), List.of());
     }
 
+    if (current.getDevice() == null || current.getDevice().getUser() == null) {
+      return new MachineMatchResult(List.of(), List.of());
+    }
+    UUID currentUserId = current.getDevice().getUser().getId();
+    UUID currentFingerprintId = current.getId();
+
     List<DeviceFingerprint> candidates =
         fingerprintRepository.findByMachineSignature(current.getMachineSignature());
 
-    UUID currentDeviceId = current.getDevice() == null ? null : current.getDevice().getId();
-
     Map<UUID, DeviceFingerprint> latestPerDevice = new HashMap<>();
     for (DeviceFingerprint fp : candidates) {
-      Device device = fp.getDevice();
-      if (device == null) {
+      // Per-fingerprint self-exclusion: skip only the just-saved fingerprint by id.
+      if (currentFingerprintId != null && currentFingerprintId.equals(fp.getId())) {
         continue;
       }
-      UUID deviceId = device.getId();
-      if (currentDeviceId != null && currentDeviceId.equals(deviceId)) {
+      Device device = fp.getDevice();
+      if (device == null || device.getUser() == null) {
+        continue;
+      }
+      // Per-user scoping: must belong to the same user as the current visit.
+      if (!currentUserId.equals(device.getUser().getId())) {
         continue;
       }
       // Hard gates: timezone and locale must co-match (null == null counts as a match).
@@ -71,6 +84,7 @@ public class MachineMatchService {
       if (!Objects.equals(fp.getLocale(), current.getLocale())) {
         continue;
       }
+      UUID deviceId = device.getId();
       DeviceFingerprint existing = latestPerDevice.get(deviceId);
       if (existing == null || fp.getCollectedAt().isAfter(existing.getCollectedAt())) {
         latestPerDevice.put(deviceId, fp);

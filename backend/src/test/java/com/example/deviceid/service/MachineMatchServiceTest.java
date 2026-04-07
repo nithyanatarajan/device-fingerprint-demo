@@ -36,7 +36,8 @@ class MachineMatchServiceTest {
 
   @Test
   void noMatchesWhenSignatureNotFound() {
-    Device current = createDevice("testuser", "Test Device");
+    User user = createUser("testuser");
+    Device current = createDevice(user, "Test Device");
     DeviceFingerprint fp = saveFingerprint(current, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
 
     MachineMatchResult result = machineMatchService.findMatches(fp);
@@ -46,41 +47,44 @@ class MachineMatchServiceTest {
   }
 
   @Test
-  void strongMatchWhenAllFourSignalsAlign() {
-    Device other = createDevice("userA", "Other Device");
-    saveFingerprint(other, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
+  void strongMatchWhenSameUserAndAllFourSignalsAlign() {
+    User user = createUser("userA");
+    Device priorDevice = createDevice(user, "Prior Device");
+    saveFingerprint(priorDevice, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
 
-    Device current = createDevice("userB", "Current Device");
+    Device current = createDevice(user, "Current Device");
     DeviceFingerprint currentFp = saveFingerprint(current, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
 
     MachineMatchResult result = machineMatchService.findMatches(currentFp);
 
     assertThat(result.strongMatches()).hasSize(1);
     assertThat(result.possibleMatches()).isEmpty();
-    assertThat(result.strongMatches().get(0).deviceId()).isEqualTo(other.getId());
+    assertThat(result.strongMatches().get(0).deviceId()).isEqualTo(priorDevice.getId());
   }
 
   @Test
-  void possibleMatchWhenIpDiffersButTimezoneAndLocaleAlign() {
-    Device other = createDevice("userA", "Other Device");
-    saveFingerprint(other, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
+  void possibleMatchWhenSameUserButIpDiffers() {
+    User user = createUser("userA");
+    Device priorDevice = createDevice(user, "Prior Device");
+    saveFingerprint(priorDevice, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
 
-    Device current = createDevice("userB", "Current Device");
+    Device current = createDevice(user, "Current Device");
     DeviceFingerprint currentFp = saveFingerprint(current, SIG_A, IP_2, TZ_NY, LOCALE_EN_US);
 
     MachineMatchResult result = machineMatchService.findMatches(currentFp);
 
     assertThat(result.strongMatches()).isEmpty();
     assertThat(result.possibleMatches()).hasSize(1);
-    assertThat(result.possibleMatches().get(0).deviceId()).isEqualTo(other.getId());
+    assertThat(result.possibleMatches().get(0).deviceId()).isEqualTo(priorDevice.getId());
   }
 
   @Test
   void noMatchWhenSignatureMatchesButTimezoneDiffers() {
-    Device other = createDevice("userA", "Other Device");
-    saveFingerprint(other, SIG_A, IP_1, TZ_LONDON, LOCALE_EN_US);
+    User user = createUser("userA");
+    Device priorDevice = createDevice(user, "Prior Device");
+    saveFingerprint(priorDevice, SIG_A, IP_1, TZ_LONDON, LOCALE_EN_US);
 
-    Device current = createDevice("userB", "Current Device");
+    Device current = createDevice(user, "Current Device");
     DeviceFingerprint currentFp = saveFingerprint(current, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
 
     MachineMatchResult result = machineMatchService.findMatches(currentFp);
@@ -91,24 +95,11 @@ class MachineMatchServiceTest {
 
   @Test
   void noMatchWhenSignatureMatchesButLocaleDiffers() {
-    Device other = createDevice("userA", "Other Device");
-    saveFingerprint(other, SIG_A, IP_1, TZ_NY, LOCALE_EN_GB);
+    User user = createUser("userA");
+    Device priorDevice = createDevice(user, "Prior Device");
+    saveFingerprint(priorDevice, SIG_A, IP_1, TZ_NY, LOCALE_EN_GB);
 
-    Device current = createDevice("userB", "Current Device");
-    DeviceFingerprint currentFp = saveFingerprint(current, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
-
-    MachineMatchResult result = machineMatchService.findMatches(currentFp);
-
-    assertThat(result.strongMatches()).isEmpty();
-    assertThat(result.possibleMatches()).isEmpty();
-  }
-
-  @Test
-  void noMatchWhenTimezoneAlignsButLocaleDiffers() {
-    Device other = createDevice("userA", "Other Device");
-    saveFingerprint(other, SIG_A, IP_1, TZ_NY, LOCALE_EN_GB);
-
-    Device current = createDevice("userB", "Current Device");
+    Device current = createDevice(user, "Current Device");
     DeviceFingerprint currentFp = saveFingerprint(current, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
 
     MachineMatchResult result = machineMatchService.findMatches(currentFp);
@@ -119,10 +110,11 @@ class MachineMatchServiceTest {
 
   @Test
   void noMatchWhenIpMatchesButSignatureDiffers() {
-    Device other = createDevice("userA", "Other Device");
-    saveFingerprint(other, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
+    User user = createUser("userA");
+    Device priorDevice = createDevice(user, "Prior Device");
+    saveFingerprint(priorDevice, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
 
-    Device current = createDevice("userB", "Current Device");
+    Device current = createDevice(user, "Current Device");
     DeviceFingerprint currentFp = saveFingerprint(current, SIG_B, IP_1, TZ_NY, LOCALE_EN_US);
 
     MachineMatchResult result = machineMatchService.findMatches(currentFp);
@@ -132,9 +124,13 @@ class MachineMatchServiceTest {
   }
 
   @Test
-  void selfMatchesAreExcluded() {
-    Device current = createDevice("testuser", "Current Device");
-    saveFingerprint(current, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
+  void crossUserMatchesAreFilteredOut() {
+    User userA = createUser("userA");
+    Device otherUserDevice = createDevice(userA, "Other User Device");
+    saveFingerprint(otherUserDevice, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
+
+    User userB = createUser("userB");
+    Device current = createDevice(userB, "Current Device");
     DeviceFingerprint currentFp = saveFingerprint(current, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
 
     MachineMatchResult result = machineMatchService.findMatches(currentFp);
@@ -144,18 +140,37 @@ class MachineMatchServiceTest {
   }
 
   @Test
-  void multipleStrongMatchesSortedByLastSeenDesc() throws InterruptedException {
-    Device olderDevice = createDevice("userA", "Older Device");
+  void selfExclusionIsPerFingerprintNotPerDevice() {
+    User user = createUser("testuser");
+    Device current = createDevice(user, "Current Device");
+    // Prior fingerprint on the same device row — must NOT be excluded.
+    DeviceFingerprint priorFp = saveFingerprint(current, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
+    // The just-saved fingerprint (same device id) — must be excluded by id.
+    DeviceFingerprint currentFp = saveFingerprint(current, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
+
+    MachineMatchResult result = machineMatchService.findMatches(currentFp);
+
+    assertThat(result.possibleMatches()).isEmpty();
+    assertThat(result.strongMatches()).hasSize(1);
+    assertThat(result.strongMatches().get(0).deviceId()).isEqualTo(current.getId());
+    assertThat(result.strongMatches().get(0).lastSeenAt()).isEqualTo(priorFp.getCollectedAt());
+  }
+
+  @Test
+  void multipleDevicesForSameUserAreSortedByLastSeenDesc() throws InterruptedException {
+    User user = createUser("userA");
+
+    Device olderDevice = createDevice(user, "Older Device");
     saveFingerprint(olderDevice, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
 
     Thread.sleep(10);
 
-    Device newerDevice = createDevice("userB", "Newer Device");
+    Device newerDevice = createDevice(user, "Newer Device");
     saveFingerprint(newerDevice, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
 
     Thread.sleep(10);
 
-    Device current = createDevice("userC", "Current Device");
+    Device current = createDevice(user, "Current Device");
     DeviceFingerprint currentFp = saveFingerprint(current, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
 
     MachineMatchResult result = machineMatchService.findMatches(currentFp);
@@ -171,20 +186,22 @@ class MachineMatchServiceTest {
   @Test
   void mixedStrongAndPossibleMatchesAreClassifiedAndSortedIndependently()
       throws InterruptedException {
-    Device strongOlder = createDevice("userA", "Strong Older");
+    User user = createUser("testuser");
+
+    Device strongOlder = createDevice(user, "Strong Older");
     saveFingerprint(strongOlder, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
     Thread.sleep(10);
-    Device possibleOlder = createDevice("userB", "Possible Older");
+    Device possibleOlder = createDevice(user, "Possible Older");
     saveFingerprint(possibleOlder, SIG_A, IP_2, TZ_NY, LOCALE_EN_US);
     Thread.sleep(10);
-    Device strongNewer = createDevice("userC", "Strong Newer");
+    Device strongNewer = createDevice(user, "Strong Newer");
     saveFingerprint(strongNewer, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
     Thread.sleep(10);
-    Device possibleNewer = createDevice("userD", "Possible Newer");
+    Device possibleNewer = createDevice(user, "Possible Newer");
     saveFingerprint(possibleNewer, SIG_A, IP_2, TZ_NY, LOCALE_EN_US);
     Thread.sleep(10);
 
-    Device current = createDevice("testuser", "Current Device");
+    Device current = createDevice(user, "Current Device");
     DeviceFingerprint currentFp = saveFingerprint(current, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
 
     MachineMatchResult result = machineMatchService.findMatches(currentFp);
@@ -200,12 +217,13 @@ class MachineMatchServiceTest {
 
   @Test
   void onlyLatestFingerprintPerOtherDeviceIsReturned() throws InterruptedException {
-    Device other = createDevice("userA", "Other Device");
+    User user = createUser("userA");
+    Device other = createDevice(user, "Other Device");
     saveFingerprint(other, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
     Thread.sleep(10);
     DeviceFingerprint latestOther = saveFingerprint(other, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
 
-    Device current = createDevice("userB", "Current Device");
+    Device current = createDevice(user, "Current Device");
     DeviceFingerprint currentFp = saveFingerprint(current, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
 
     MachineMatchResult result = machineMatchService.findMatches(currentFp);
@@ -216,7 +234,8 @@ class MachineMatchServiceTest {
 
   @Test
   void nullSignatureReturnsEmpty() {
-    Device current = createDevice("testuser", "Current Device");
+    User user = createUser("testuser");
+    Device current = createDevice(user, "Current Device");
     DeviceFingerprint fp = saveFingerprint(current, null, IP_1, TZ_NY, LOCALE_EN_US);
 
     MachineMatchResult result = machineMatchService.findMatches(fp);
@@ -227,36 +246,41 @@ class MachineMatchServiceTest {
 
   @Test
   void bothNullPublicIpsAreTreatedAsStrong() {
-    Device other = createDevice("userA", "Other Device");
-    saveFingerprint(other, SIG_A, null, TZ_NY, LOCALE_EN_US);
+    User user = createUser("userA");
+    Device prior = createDevice(user, "Prior Device");
+    saveFingerprint(prior, SIG_A, null, TZ_NY, LOCALE_EN_US);
 
-    Device current = createDevice("userB", "Current Device");
+    Device current = createDevice(user, "Current Device");
     DeviceFingerprint currentFp = saveFingerprint(current, SIG_A, null, TZ_NY, LOCALE_EN_US);
 
     MachineMatchResult result = machineMatchService.findMatches(currentFp);
 
     assertThat(result.strongMatches()).hasSize(1);
     assertThat(result.possibleMatches()).isEmpty();
-    assertThat(result.strongMatches().get(0).deviceId()).isEqualTo(other.getId());
+    assertThat(result.strongMatches().get(0).deviceId()).isEqualTo(prior.getId());
   }
 
   @Test
   void oneNullPublicIpIsClassifiedAsPossible() {
-    Device other = createDevice("userA", "Other Device");
-    saveFingerprint(other, SIG_A, null, TZ_NY, LOCALE_EN_US);
+    User user = createUser("userA");
+    Device prior = createDevice(user, "Prior Device");
+    saveFingerprint(prior, SIG_A, null, TZ_NY, LOCALE_EN_US);
 
-    Device current = createDevice("userB", "Current Device");
+    Device current = createDevice(user, "Current Device");
     DeviceFingerprint currentFp = saveFingerprint(current, SIG_A, IP_1, TZ_NY, LOCALE_EN_US);
 
     MachineMatchResult result = machineMatchService.findMatches(currentFp);
 
     assertThat(result.strongMatches()).isEmpty();
     assertThat(result.possibleMatches()).hasSize(1);
-    assertThat(result.possibleMatches().get(0).deviceId()).isEqualTo(other.getId());
+    assertThat(result.possibleMatches().get(0).deviceId()).isEqualTo(prior.getId());
   }
 
-  private Device createDevice(String userName, String label) {
-    User user = userRepository.save(new User(userName));
+  private User createUser(String name) {
+    return userRepository.save(new User(name));
+  }
+
+  private Device createDevice(User user, String label) {
     return deviceRepository.save(new Device(user, label));
   }
 

@@ -52,7 +52,7 @@ class CollectionControllerTest {
                       req.setRemoteAddr("10.0.0.1");
                       return req;
                     })
-                .content(collectRequestJson("userA")))
+                .content(collectRequestJson("testuser")))
         .andExpect(status().isOk());
 
     mockMvc
@@ -65,9 +65,9 @@ class CollectionControllerTest {
                       req.setRemoteAddr("10.0.0.99");
                       return req;
                     })
-                .content(collectRequestJson("userB")))
+                .content(collectRequestJson("testuser")))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.machineMatch.strongMatches[0].userName").value("usera"));
+        .andExpect(jsonPath("$.machineMatch.strongMatches[0].userName").value("testuser"));
   }
 
   @Test
@@ -77,7 +77,7 @@ class CollectionControllerTest {
             post("/api/collect")
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("X-Forwarded-For", "203.0.113.77")
-                .content(collectRequestJson("userA")))
+                .content(collectRequestJson("testuser")))
         .andExpect(status().isOk());
 
     mockMvc
@@ -85,9 +85,9 @@ class CollectionControllerTest {
             post("/api/collect")
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("X-Forwarded-For", "203.0.113.77, 10.0.0.1, 10.0.0.2")
-                .content(collectRequestJson("userB")))
+                .content(collectRequestJson("testuser")))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.machineMatch.strongMatches[0].userName").value("usera"));
+        .andExpect(jsonPath("$.machineMatch.strongMatches[0].userName").value("testuser"));
   }
 
   @Test
@@ -101,7 +101,7 @@ class CollectionControllerTest {
                       req.setRemoteAddr("198.51.100.42");
                       return req;
                     })
-                .content(collectRequestJson("userA")))
+                .content(collectRequestJson("testuser")))
         .andExpect(status().isOk());
 
     mockMvc
@@ -114,9 +114,9 @@ class CollectionControllerTest {
                       req.setRemoteAddr("198.51.100.42");
                       return req;
                     })
-                .content(collectRequestJson("userB")))
+                .content(collectRequestJson("testuser")))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.machineMatch.strongMatches[0].userName").value("usera"));
+        .andExpect(jsonPath("$.machineMatch.strongMatches[0].userName").value("testuser"));
   }
 
   @Test

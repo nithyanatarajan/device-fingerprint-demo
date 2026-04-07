@@ -63,28 +63,40 @@ class CollectionServiceTest {
   }
 
   @Test
-  void crossUserSameMachineShouldSurfacePriorIdentityAsStrongMatch() {
-    CollectResponse first = collectionService.collect(createRequest("userA"), "203.0.113.10");
+  void crossUserSameMachineShouldNotSurfaceUnderPerUserScoping() {
+    collectionService.collect(createRequest("userA"), "203.0.113.10");
     CollectResponse second = collectionService.collect(createRequest("userB"), "203.0.113.10");
 
+    assertThat(second.machineMatch()).isNotNull();
+    assertThat(second.machineMatch().strongMatches()).isEmpty();
+    assertThat(second.machineMatch().possibleMatches()).isEmpty();
+  }
+
+  @Test
+  void crossUserSameMachineDifferentNetworkShouldNotSurfaceUnderPerUserScoping() {
+    collectionService.collect(createRequest("userA"), "203.0.113.10");
+    CollectResponse second = collectionService.collect(createRequest("userB"), "198.51.100.20");
+
+    assertThat(second.machineMatch()).isNotNull();
+    assertThat(second.machineMatch().strongMatches()).isEmpty();
+    assertThat(second.machineMatch().possibleMatches()).isEmpty();
+  }
+
+  @Test
+  void sameUserSecondVisitShouldSurfacePriorFingerprintOnSameDeviceAsStrongMatch() {
+    CollectResponse first = collectionService.collect(createRequest("testuser"), "203.0.113.10");
+    CollectResponse second = collectionService.collect(createRequest("testuser"), "203.0.113.10");
+
+    // Phase 1 will recognize this as SAME_DEVICE and reuse the device row.
+    assertThat(second.deviceId()).isEqualTo(first.deviceId());
+
+    // Phase 2 speaks independently: the prior fingerprint on the same device row is
+    // included in the match list under per-fingerprint self-exclusion.
     assertThat(second.machineMatch()).isNotNull();
     assertThat(second.machineMatch().possibleMatches()).isEmpty();
     assertThat(second.machineMatch().strongMatches()).hasSize(1);
     assertThat(second.machineMatch().strongMatches().get(0).deviceId()).isEqualTo(first.deviceId());
     assertThat(second.machineMatch().strongMatches().get(0).userId()).isEqualTo(first.userId());
-  }
-
-  @Test
-  void crossUserSameMachineDifferentNetworkShouldSurfaceAsPossibleMatch() {
-    CollectResponse first = collectionService.collect(createRequest("userA"), "203.0.113.10");
-    CollectResponse second = collectionService.collect(createRequest("userB"), "198.51.100.20");
-
-    assertThat(second.machineMatch()).isNotNull();
-    assertThat(second.machineMatch().strongMatches()).isEmpty();
-    assertThat(second.machineMatch().possibleMatches()).hasSize(1);
-    assertThat(second.machineMatch().possibleMatches().get(0).deviceId())
-        .isEqualTo(first.deviceId());
-    assertThat(second.machineMatch().possibleMatches().get(0).userId()).isEqualTo(first.userId());
   }
 
   @Test

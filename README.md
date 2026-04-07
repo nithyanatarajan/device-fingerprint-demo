@@ -2,6 +2,11 @@
 
 A full-stack device fingerprinting and identification management platform built with AI-assisted development.
 
+## Documentation
+
+- [`SPEC.md`](SPEC.md) — formal product specification
+- [`docs/how-it-works.md`](docs/how-it-works.md) — end-to-end mental model: the "two voices" architecture, what each phase does, why each signal is included or excluded from the hash, scenario reference, and the false positive trade-off
+
 ## Tech Stack
 
 - **Backend:** Java 25 + Spring Boot 4 + Gradle

@@ -199,65 +199,54 @@ Each phase is demo-able on its own. If time runs out at any phase boundary, we s
 
 ### Phase 2: Cross-Browser, Per-User Machine Identification
 
-A second identity axis on top of Phase 1. Phase 1 matches per-browser fingerprints; this phase recognizes the same **hardware** across different browsers and networks for the **same user**, purely additive and without touching the per-browser scoring pipeline.
+Recognizes the same **hardware** across different browsers for the **same user**. Runs alongside Phase 1 as an independent second voice; both verdicts render side by side in the UI.
 
-**Two voices, both speak.** Phase 1 and Phase 2 are independent identification mechanisms operating on different signal sets and with different scopes. Both render their conclusions side by side in the UI; the audience compares the two voices. Phase 2 does **not** suppress itself based on what Phase 1 has decided. When they agree, that is high confidence; when they disagree, the audience learns *why* — which is the educational moment of a fingerprinting demo.
+**Frontend: Same Machine panel**
+- Below the Phase 1 result on the collection page
+- Two conditional sections:
+  - **"Same machine"** — rendered when there are strong matches
+  - **"Matching hardware"** — rendered when there are possible matches (different network)
+- Hidden entirely when both lists are empty
+- Each row: `<deviceLabel>` with relative last-seen time
+- Phase 2 chip alongside the Phase 1 chip: `SAME_MACHINE` / `MATCHING_HARDWARE` / `NO_MACHINE_MATCH`
 
-**Demo moment this enables:** "Open Chrome, identify yourself. Switch to Firefox on the same laptop, identify yourself again with the same name. Phase 1 says *'drift detected on your existing device'* via per-user scoring. Phase 2 *independently* says *'same machine — Chrome on MacOS, 5 minutes ago'* via hardware signature matching. Two mechanisms, two voices, same answer."
-
-**Per-user scoping (privacy-first):** Phase 2 only matches against fingerprints belonging to the **same user** as the current visit. We never surface another user's data, even if their hardware happens to match. This eliminates cross-user false positives entirely (household collisions, urban hardware collisions, two-Macs-around-the-world). Without it, even with strong privacy posture, clients would find the cross-user surfacing uneasy — *"your data is being shown to other users"* — and rightly so.
-
-**Hardware signature (6 signals, browser-independent, OS-update-independent):**
+**Hash inputs (machine signature):**
 - `platform`
 - `screenResolution`
-- `colorDepth`
-- `hardwareConcurrency`
-- `deviceMemory`
+- `pixelRatio`
 - `touchSupport`
+- `fontHash` (frontend probes ~150 fonts via `document.fonts.check()` and hashes the installed set)
 
-Browser-specific signals (canvas, webgl, userAgent, codecs) are deliberately **excluded** — they change per browser. `timezone` is also **excluded** from the hash because it is an OS setting that changes when the user travels or on DST transitions; including it would break machine recognition when someone flies across timezones on the same laptop.
+**Match gates** (must all pass for a candidate to surface):
+- Hardware signature equality
+- `timezone` equality (alias-aware via `ZoneRules`, so `Asia/Calcutta` ≡ `Asia/Kolkata`)
+- `locale` primary-language equality (`en-GB` ≡ `en-US`)
+- Per-user scoping: candidate must belong to the same user as the current visit
 
-**Context signals (used as match gates, not in the hash):**
-- `timezone` — hard co-match gate
-- `locale` — hard co-match gate
-- `publicIp` — gate between strong and possible tier
+**Tiering** (gate applied after the above):
+- **Strong** ("Same machine"): `publicIp` also matches
+- **Possible** ("Matching hardware"): `publicIp` differs
 
-**Design:**
-- **Exact-match SHA-256 hash** over the 6 hardware signals in canonical order. Stored as a column on `DeviceFingerprint`. Swappable to fuzzy matching later as an internal refactor of `MachineSignatureService`.
-- **Per-user query scope:** the match query filters to fingerprints whose device belongs to the current user. Cross-user matching is **never** performed.
-- **Tiered matching** — the product never makes a claim it cannot defend:
-  - **Strong match** ("Same machine"): hardware signature **AND** `timezone` **AND** `locale` **AND** `publicIp` all match.
-  - **Possible match** ("Matching hardware"): hardware signature **AND** `timezone` **AND** `locale` match, but `publicIp` differs. Captures the "same machine on a different network" scenarios (VPN, café, mobile hotspot, roamed to a new Wi-Fi) without dropping them silently.
-  - **Hidden**: anything else. Hardware match without timezone match, or without locale match, is suppressed. Different hardware is suppressed regardless. Different user is suppressed regardless.
-- **No VPN detection, no IP geolocation, no ASN lookup.** The product only claims what it can prove.
-- **Self-exclusion is per-fingerprint, not per-device.** Only the just-saved fingerprint is excluded from the match list. Other fingerprints on the **same device** as the current visit (e.g., the user's prior visits before Phase 1's drift logic merged them into a single device row) are **included** — Phase 2 speaks regardless of how Phase 1 categorized them.
-- **Stored columns, not computed on-the-fly.** `machineSignature` and `publicIp` are persisted on `DeviceFingerprint` for fast indexed lookup; `timezone` and `locale` are already persisted from Phase 1.
-
-**Why two tiers, not a single confidence score:** A score would blur the line between "I can prove this" and "I can only suggest this". The tiers make the distinction visible and non-negotiable — the audience can read either heading and know exactly what's being claimed.
+**Storage:**
+- `machineSignature`, `publicIp`, and `fontHash` are persisted columns on `DeviceFingerprint`
+- `timezone` and `locale` reuse the columns from Phase 1
+- Self-exclusion is per-fingerprint (only the just-saved row is excluded), not per-device
 
 **APIs:**
-- `POST /api/collect` response extended with a `machineMatch` field:
+- `POST /api/collect` response gains a `machineMatch` field:
   ```
   {
     "strongMatches":   [{ userId, userName, deviceId, deviceLabel, lastSeenAt }],
     "possibleMatches": [{ userId, userName, deviceId, deviceLabel, lastSeenAt }]
   }
   ```
-  Both lists are always present; either may be empty.
+  Both lists always present; either may be empty.
 
-**Frontend:**
-- A **Same Machine** panel below the per-device match result. Two sections rendered conditionally:
-  - **Strong section** ("Same machine") — rendered when `strongMatches` is non-empty. Description: *"Your other sessions on this hardware, on the same network."*
-  - **Possible section** ("Matching hardware") — rendered when `possibleMatches` is non-empty. Outlined with a muted warning accent. Description: *"Your other sessions with the same hardware, from a different network. Could be the same machine on a different Wi-Fi or VPN."*
-- The panel is entirely hidden when both lists are empty.
-- Each row: `<deviceLabel>` with relative last-seen time. The user name is omitted because it is always the current user (per-user scoping).
-- No cross-user disclaimer needed in the footer — there is no cross-user matching to disclaim.
+**Known limitations:**
+- A user owning two physically distinct devices with identical hardware specs and identical installed font sets will surface as a match (rare).
+- A user travelling across timezones on the same laptop will not surface a Phase 2 match until they re-register under the new timezone (Phase 1 still recognises the device).
 
-**Known limitations (smaller than they were under cross-user scoping):**
-1. **Same user, multiple identical devices:** if a user has registered two distinct laptops with identical hardware specs (e.g., two MacBook Pros, same RAM/screen), they will appear as Phase 2 matches for each other. This is arguably correct — they ARE both the user's devices — and is informational rather than a false positive.
-2. **Traveling across timezones:** a user flying with the same laptop from one timezone to another will not surface a Phase 2 match until they re-register under the new timezone. This is conservative by design — preferring a missed match over a false positive. Phase 1 will still recognize the device (timezone is only 1 of 15 signals there).
-
-**Note:** The previous design's household and urban hardware-collision false positives are eliminated by per-user scoping. They simply cannot occur because Phase 2 never queries across user boundaries.
+**Design rationale, signal exclusion reasoning, false-positive analysis, and the full scenario reference are in [`docs/how-it-works.md`](docs/how-it-works.md).**
 
 ### Phase 3: Scoring Engine + Tuning Console
 

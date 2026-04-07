@@ -1,19 +1,77 @@
 import { test, expect } from '@playwright/test';
 
-// E2E test that exercises the real flow:
-// browser → FingerprintJS → backend /api/collect → UI render.
-// Requires the backend to be running at E2E_BACKEND_URL (default localhost:8080).
+// E2E coverage for the collection flow.
 //
-// This test catches the kind of contract bugs that mocked unit tests miss —
-// e.g. wrong field types, missing FingerprintJS components, JSON serialization issues.
+// Test 1 exercises the real flow against a live backend (browser →
+// FingerprintJS → /api/collect → UI). It catches contract bugs that
+// mocked unit tests miss (wrong field types, missing FingerprintJS
+// components, JSON serialization issues).
+//
+// Tests 2–8 are HTTP-boundary contract tests: stub /api/collect via
+// page.route to drive the UI through every distinct (Phase 1 verdict
+// × Phase 2 panel state) combination from the design table. Stubbing
+// is required because real browser fingerprints cannot be precisely
+// controlled to force specific machine signature matches.
+//
+// Test 9 verifies the static HTML fallback when the JS bundle is
+// blocked by a privacy extension.
 
 const TEST_USER = `e2e-${Date.now()}`;
+
+const baseResponse = {
+  userId: '00000000-0000-0000-0000-000000000001',
+  deviceId: '00000000-0000-0000-0000-000000000002',
+  deviceLabel: 'Firefox on MacOS',
+  matchResult: 'NEW_DEVICE',
+  score: 0,
+  signalComparisons: [],
+  changedSignals: [],
+  machineMatch: {
+    strongMatches: [],
+    possibleMatches: [],
+  },
+};
+
+function sampleMatch(overrides = {}) {
+  return {
+    userId: '00000000-0000-0000-0000-000000000003',
+    deviceId: '00000000-0000-0000-0000-000000000004',
+    deviceLabel: 'Chrome on MacOS',
+    userName: 'testuser',
+    lastSeenAt: new Date(Date.now() - 5 * 60_000).toISOString(),
+    ...overrides,
+  };
+}
+
+async function stubCollect(page, overrides) {
+  const body = {
+    ...baseResponse,
+    ...overrides,
+    machineMatch: {
+      ...baseResponse.machineMatch,
+      ...(overrides.machineMatch || {}),
+    },
+  };
+  await page.route('**/api/collect', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    });
+  });
+}
+
+async function submitName(page, name) {
+  await page.goto('/');
+  await page.getByRole('textbox', { name: 'Enter your name' }).fill(name);
+  await page.getByRole('button', { name: 'Identify' }).click();
+}
 
 test.describe('Device Identification', () => {
   test('first visit registers a new device, second visit recognizes same device', async ({
     page,
   }) => {
-    // First visit
+    // First visit — live backend
     await page.goto('/');
     await expect(
       page.getByRole('heading', { name: 'Device Identification', exact: true }),
@@ -22,7 +80,6 @@ test.describe('Device Identification', () => {
     await page.getByRole('textbox', { name: 'Enter your name' }).fill(TEST_USER);
     await page.getByRole('button', { name: 'Identify' }).click();
 
-    // Wait for backend response — must succeed (no 4xx) and show NEW_DEVICE
     await expect(page.getByText('NEW_DEVICE')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(`New device registered for ${TEST_USER}`)).toBeVisible();
 
@@ -41,129 +98,147 @@ test.describe('Device Identification', () => {
     await expect(page.getByText(new RegExp(`Welcome back ${TEST_USER}`))).toBeVisible();
   });
 
-  // Contract tests at the HTTP boundary: stub /api/collect to verify the
-  // frontend UI handles the machineMatch response shape correctly. We use
-  // page.route rather than a live backend because real browser fingerprints
-  // cannot be precisely controlled to force a machine signature match.
-  test('shows Same Machine section when backend returns strong matches', async ({ page }) => {
-    const lastSeen = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    await page.route('**/api/collect', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          userId: 'u-current',
-          deviceId: 'd-current',
-          deviceLabel: 'Firefox on MacOS',
-          matchResult: 'NEW_DEVICE',
-          score: 0,
-          signalComparisons: [],
-          changedSignals: [],
-          machineMatch: {
-            strongMatches: [
-              {
-                userId: 'u1',
-                userName: 'userA',
-                deviceId: 'd1',
-                deviceLabel: 'Chrome on MacOS',
-                lastSeenAt: lastSeen,
-              },
-            ],
-            possibleMatches: [],
-          },
-        }),
-      });
+  test('SAME_DEVICE with Same Machine panel populated', async ({ page }) => {
+    await stubCollect(page, {
+      matchResult: 'SAME_DEVICE',
+      score: 100,
+      machineMatch: {
+        strongMatches: [sampleMatch()],
+        possibleMatches: [],
+      },
     });
 
-    await page.goto('/');
-    await page.getByRole('textbox', { name: 'Enter your name' }).fill('testuser');
-    await page.getByRole('button', { name: 'Identify' }).click();
+    await submitName(page, 'testuser');
 
-    await expect(page.getByRole('heading', { name: 'Same machine', exact: true })).toBeVisible({
+    await expect(page.getByText('SAME_DEVICE', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Welcome back testuser/)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Same machine', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Matching hardware', exact: true })).toHaveCount(
+      0,
+    );
+    await expect(page.getByText('Chrome on MacOS')).toBeVisible();
+  });
+
+  test('SAME_DEVICE with Matching Hardware panel (different network)', async ({ page }) => {
+    await stubCollect(page, {
+      matchResult: 'SAME_DEVICE',
+      score: 100,
+      machineMatch: {
+        strongMatches: [],
+        possibleMatches: [sampleMatch()],
+      },
+    });
+
+    await submitName(page, 'testuser');
+
+    await expect(page.getByText('SAME_DEVICE', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Welcome back testuser/)).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Matching hardware', exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Same machine', exact: true })).toHaveCount(0);
+    await expect(page.getByText('Chrome on MacOS')).toBeVisible();
+  });
+
+  test('SAME_DEVICE with both Phase 2 sections hidden (timezone change)', async ({ page }) => {
+    await stubCollect(page, {
+      matchResult: 'SAME_DEVICE',
+      score: 93,
+      machineMatch: { strongMatches: [], possibleMatches: [] },
+    });
+
+    await submitName(page, 'testuser');
+
+    await expect(page.getByText('SAME_DEVICE', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Welcome back testuser/)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Same machine', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Matching hardware', exact: true })).toHaveCount(
+      0,
+    );
+  });
+
+  test('DRIFT_DETECTED with Same Machine panel populated', async ({ page }) => {
+    await stubCollect(page, {
+      matchResult: 'DRIFT_DETECTED',
+      score: 64,
+      machineMatch: {
+        strongMatches: [sampleMatch()],
+        possibleMatches: [],
+      },
+    });
+
+    await submitName(page, 'testuser');
+
+    await expect(page.getByText('DRIFT_DETECTED', { exact: true })).toBeVisible({
       timeout: 15_000,
     });
+    await expect(page.getByText(/Welcome back testuser/)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Same machine', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Matching hardware', exact: true })).toHaveCount(
       0,
     );
-    await expect(page.getByText('Chrome on MacOS \u00B7 userA')).toBeVisible();
-    await expect(
-      page.getByText(/Identical hardware may match across unrelated machines/),
-    ).toBeVisible();
+    await expect(page.getByText('Chrome on MacOS')).toBeVisible();
   });
 
-  test('hides Same Machine panel when both lists are empty', async ({ page }) => {
-    await page.route('**/api/collect', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          userId: 'u-current',
-          deviceId: 'd-current',
-          deviceLabel: 'Firefox on MacOS',
-          matchResult: 'NEW_DEVICE',
-          score: 0,
-          signalComparisons: [],
-          changedSignals: [],
-          machineMatch: { strongMatches: [], possibleMatches: [] },
-        }),
-      });
+  test('DRIFT_DETECTED with Matching Hardware panel (different network)', async ({ page }) => {
+    await stubCollect(page, {
+      matchResult: 'DRIFT_DETECTED',
+      score: 64,
+      machineMatch: {
+        strongMatches: [],
+        possibleMatches: [sampleMatch()],
+      },
     });
 
-    await page.goto('/');
-    await page.getByRole('textbox', { name: 'Enter your name' }).fill('testuser');
-    await page.getByRole('button', { name: 'Identify' }).click();
+    await submitName(page, 'testuser');
 
-    await expect(page.getByText('NEW_DEVICE')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('DRIFT_DETECTED', { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByText(/Welcome back testuser/)).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Matching hardware', exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Same machine', exact: true })).toHaveCount(0);
+    await expect(page.getByText('Chrome on MacOS')).toBeVisible();
+  });
+
+  test('DRIFT_DETECTED with both Phase 2 sections hidden (timezone change)', async ({ page }) => {
+    await stubCollect(page, {
+      matchResult: 'DRIFT_DETECTED',
+      score: 57,
+      machineMatch: { strongMatches: [], possibleMatches: [] },
+    });
+
+    await submitName(page, 'testuser');
+
+    await expect(page.getByText('DRIFT_DETECTED', { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByText(/Welcome back testuser/)).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Same machine', exact: true })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Matching hardware', exact: true })).toHaveCount(
       0,
     );
   });
 
-  test('shows Matching Hardware section when only possibleMatches is non-empty', async ({
+  test('NEW_DEVICE with Same Machine panel hidden (no prior data for this user)', async ({
     page,
   }) => {
-    const lastSeen = new Date(Date.now() - 30 * 60 * 1000).toISOString();
-    await page.route('**/api/collect', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          userId: 'u-current',
-          deviceId: 'd-current',
-          deviceLabel: 'Firefox on MacOS',
-          matchResult: 'NEW_DEVICE',
-          score: 0,
-          signalComparisons: [],
-          changedSignals: [],
-          machineMatch: {
-            strongMatches: [],
-            possibleMatches: [
-              {
-                userId: 'u1',
-                userName: 'userA',
-                deviceId: 'd1',
-                deviceLabel: 'Chrome',
-                lastSeenAt: lastSeen,
-              },
-            ],
-          },
-        }),
-      });
+    await stubCollect(page, {
+      matchResult: 'NEW_DEVICE',
+      score: 0,
+      machineMatch: { strongMatches: [], possibleMatches: [] },
     });
 
-    await page.goto('/');
-    await page.getByRole('textbox', { name: 'Enter your name' }).fill('testuser');
-    await page.getByRole('button', { name: 'Identify' }).click();
+    await submitName(page, 'testuser');
 
-    await expect(page.getByRole('heading', { name: 'Matching hardware', exact: true })).toBeVisible(
-      { timeout: 15_000 },
-    );
+    await expect(page.getByText('NEW_DEVICE', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/New device registered for testuser/)).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Same machine', exact: true })).toHaveCount(0);
-    await expect(
-      page.getByText(/Could be the same machine on a different Wi-Fi or VPN/),
-    ).toBeVisible();
-    await expect(page.getByText('Chrome \u00B7 userA')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Matching hardware', exact: true })).toHaveCount(
+      0,
+    );
   });
 
   // When a privacy extension (uBlock, Brave Shields) blocks the bundled

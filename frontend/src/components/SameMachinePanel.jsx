@@ -4,7 +4,6 @@ import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
 import Stack from '@mui/material/Stack';
-import Box from '@mui/material/Box';
 
 export function formatRelativeTime(isoString, now = Date.now()) {
   const then = new Date(isoString).getTime();
@@ -34,7 +33,7 @@ function MatchList({ matches }) {
       {matches.map((match) => (
         <ListItem key={`${match.userId}-${match.deviceId}`} disableGutters>
           <ListItemText
-            primary={`${match.deviceLabel} \u00B7 ${match.userName}`}
+            primary={match.deviceLabel}
             secondary={formatRelativeTime(match.lastSeenAt)}
           />
         </ListItem>
@@ -59,7 +58,7 @@ export default function SameMachinePanel({ strongMatches, possibleMatches }) {
             Same machine
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Other browsers seen with the same hardware and on the same network.
+            Your other sessions on this hardware, on the same network.
           </Typography>
           <MatchList matches={strong} />
         </Paper>
@@ -71,18 +70,12 @@ export default function SameMachinePanel({ strongMatches, possibleMatches }) {
             Matching hardware
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Same device profile from a different network. Could be the same machine on a different
-            Wi-Fi or VPN, or an unrelated machine with identical hardware.
+            Your other sessions with the same hardware, from a different network. Could be the same
+            machine on a different Wi-Fi or VPN.
           </Typography>
           <MatchList matches={possible} />
         </Paper>
       )}
-
-      <Box>
-        <Typography variant="caption" color="text.secondary">
-          Based on device hardware. Identical hardware may match across unrelated machines.
-        </Typography>
-      </Box>
     </Stack>
   );
 }

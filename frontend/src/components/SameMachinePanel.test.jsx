@@ -2,9 +2,8 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import SameMachinePanel, { formatRelativeTime } from './SameMachinePanel';
 
-const STRONG_CAVEAT = /Other browsers seen with the same hardware/;
-const POSSIBLE_CAVEAT = /Could be the same machine on a different Wi-Fi or VPN/;
-const FOOTER_CAVEAT = /Identical hardware may match across unrelated machines/;
+const STRONG_CAVEAT = /Your other sessions on this hardware, on the same network/;
+const POSSIBLE_CAVEAT = /Your other sessions with the same hardware, from a different network/;
 
 function makeMatch(overrides = {}) {
   return {
@@ -31,7 +30,7 @@ describe('SameMachinePanel', () => {
   it('renders only the strong section when only strongMatches is non-empty', () => {
     render(
       <SameMachinePanel
-        strongMatches={[makeMatch({ userName: 'userA', deviceLabel: 'Chrome on MacOS' })]}
+        strongMatches={[makeMatch({ deviceLabel: 'Chrome on MacOS' })]}
         possibleMatches={[]}
       />,
     );
@@ -40,7 +39,7 @@ describe('SameMachinePanel', () => {
     expect(
       screen.queryByRole('heading', { name: 'Matching hardware', exact: true }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText('Chrome on MacOS \u00B7 userA')).toBeInTheDocument();
+    expect(screen.getByText('Chrome on MacOS')).toBeInTheDocument();
     expect(screen.queryByText(POSSIBLE_CAVEAT)).not.toBeInTheDocument();
   });
 
@@ -52,7 +51,6 @@ describe('SameMachinePanel', () => {
           makeMatch({
             userId: 'u2',
             deviceId: 'd2',
-            userName: 'userB',
             deviceLabel: 'Firefox on Linux',
           }),
         ]}
@@ -65,21 +63,18 @@ describe('SameMachinePanel', () => {
     expect(
       screen.queryByRole('heading', { name: 'Same machine', exact: true }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText('Firefox on Linux \u00B7 userB')).toBeInTheDocument();
+    expect(screen.getByText('Firefox on Linux')).toBeInTheDocument();
     expect(screen.getByText(POSSIBLE_CAVEAT)).toBeInTheDocument();
   });
 
   it('renders both sections when both lists are non-empty', () => {
     render(
       <SameMachinePanel
-        strongMatches={[
-          makeMatch({ userId: 'u1', deviceId: 'd1', userName: 'userA', deviceLabel: 'Chrome' }),
-        ]}
+        strongMatches={[makeMatch({ userId: 'u1', deviceId: 'd1', deviceLabel: 'Chrome' })]}
         possibleMatches={[
           makeMatch({
             userId: 'u2',
             deviceId: 'd2',
-            userName: 'userB',
             deviceLabel: 'Safari on iOS',
           }),
         ]}
@@ -90,8 +85,8 @@ describe('SameMachinePanel', () => {
     expect(
       screen.getByRole('heading', { name: 'Matching hardware', exact: true }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Chrome \u00B7 userA')).toBeInTheDocument();
-    expect(screen.getByText('Safari on iOS \u00B7 userB')).toBeInTheDocument();
+    expect(screen.getByText('Chrome')).toBeInTheDocument();
+    expect(screen.getByText('Safari on iOS')).toBeInTheDocument();
   });
 
   it('renders relative time for each row across both sections', () => {
@@ -101,7 +96,6 @@ describe('SameMachinePanel', () => {
           makeMatch({
             userId: 'u1',
             deviceId: 'd1',
-            userName: 'userA',
             lastSeenAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
           }),
         ]}
@@ -109,7 +103,6 @@ describe('SameMachinePanel', () => {
           makeMatch({
             userId: 'u2',
             deviceId: 'd2',
-            userName: 'userB',
             lastSeenAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
           }),
         ]}
@@ -120,24 +113,21 @@ describe('SameMachinePanel', () => {
     expect(screen.getByText('3 hours ago')).toBeInTheDocument();
   });
 
-  it('renders the strong-section caveat when strong section is shown', () => {
+  it('renders the strong-section description when strong section is shown', () => {
     render(<SameMachinePanel strongMatches={[makeMatch()]} possibleMatches={[]} />);
     expect(screen.getByText(STRONG_CAVEAT)).toBeInTheDocument();
   });
 
-  it('renders the possible-section caveat when possible section is shown', () => {
+  it('renders the possible-section description when possible section is shown', () => {
     render(<SameMachinePanel strongMatches={[]} possibleMatches={[makeMatch()]} />);
     expect(screen.getByText(POSSIBLE_CAVEAT)).toBeInTheDocument();
   });
 
-  it('renders the footer caveat when at least one section is shown', () => {
-    render(<SameMachinePanel strongMatches={[makeMatch()]} possibleMatches={[]} />);
-    expect(screen.getByText(FOOTER_CAVEAT)).toBeInTheDocument();
-  });
-
-  it('renders the footer caveat when only the possible section is shown', () => {
-    render(<SameMachinePanel strongMatches={[]} possibleMatches={[makeMatch()]} />);
-    expect(screen.getByText(FOOTER_CAVEAT)).toBeInTheDocument();
+  it('does not render any cross-user disclaimer footer', () => {
+    render(<SameMachinePanel strongMatches={[makeMatch()]} possibleMatches={[makeMatch()]} />);
+    expect(
+      screen.queryByText(/Identical hardware may match across unrelated machines/),
+    ).not.toBeInTheDocument();
   });
 });
 

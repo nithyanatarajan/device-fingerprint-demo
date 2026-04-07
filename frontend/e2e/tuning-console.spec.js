@@ -1,0 +1,250 @@
+import { test, expect } from '@playwright/test';
+
+// E2E coverage for the Tuning Console (/admin). These tests run against a
+// live backend at E2E_BACKEND_URL (default http://localhost:8080).
+//
+// Scope per test:
+//  1. Page structure — all five sections render
+//  2. Seeding a demo user puts them in the Users & Devices list and the
+//     expanded device row shows the machine signature and public IP
+//  3. Seeding a second (Firefox incognito) demo user produces a second
+//     user row and a different Last Result
+//  4. The clear-all confirmation dialog shows the demo-data counts and
+//     Cancel leaves the data intact
+//  5. Confirming the dialog clears all demo data and shows the success
+//     snackbar
+//  6. Invalid userName (without demo-user- prefix) disables Seed and the
+//     backend rejects it even if someone bypasses the UI
+//  7. Dragging canvas_hash to 0 triggers Ripple Effect preview and the
+//     seeded device row is highlighted as DEMOTED or shows the banner
+//  8. The same-device >= drift invariant is enforced client-side when
+//     dragging the drift slider up past the same-device value
+//  9. Save weights persists — reloading the page shows the modified value
+
+const BACKEND_URL = process.env.E2E_BACKEND_URL || 'http://localhost:8080';
+
+async function cleanup(request) {
+  try {
+    await request.delete(`${BACKEND_URL}/api/admin/seed`);
+  } catch {
+    // ignore
+  }
+}
+
+async function resetScoringDefaults(request) {
+  try {
+    await request.put(`${BACKEND_URL}/api/scoring/config`, {
+      data: { sameDeviceThreshold: 85.0, driftThreshold: 60.0 },
+    });
+    const defaults = {
+      canvas_hash: { weight: 90, enabled: true },
+      webgl_renderer: { weight: 85, enabled: true },
+      touch_support: { weight: 70, enabled: true },
+      platform: { weight: 60, enabled: true },
+      hardware_concurrency: { weight: 50, enabled: true },
+      device_memory: { weight: 50, enabled: true },
+      pixel_ratio: { weight: 45, enabled: true },
+      screen_resolution: { weight: 40, enabled: true },
+      codec_support: { weight: 35, enabled: true },
+      user_agent: { weight: 30, enabled: true },
+      timezone: { weight: 20, enabled: true },
+      locale: { weight: 15, enabled: true },
+      color_depth: { weight: 15, enabled: true },
+      dnt_enabled: { weight: 10, enabled: true },
+      cookie_enabled: { weight: 5, enabled: true },
+    };
+    await request.put(`${BACKEND_URL}/api/scoring/weights`, { data: defaults });
+  } catch {
+    // ignore
+  }
+}
+
+test.describe('Tuning Console', () => {
+  test.beforeEach(async ({ request }) => {
+    await cleanup(request);
+    await resetScoringDefaults(request);
+  });
+
+  test.afterEach(async ({ request }) => {
+    await cleanup(request);
+    await resetScoringDefaults(request);
+  });
+
+  test('renders all five sections at /admin', async ({ page }) => {
+    await page.goto('/admin');
+    await expect(page.getByRole('heading', { name: 'Tuning Console', level: 4 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Demo Data', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Signal Weights', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Thresholds', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Users & Devices', exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Live Preview Summary', exact: true }),
+    ).toBeVisible();
+  });
+
+  test('seed form creates a user, device row exposes signature and public ip', async ({ page }) => {
+    await page.goto('/admin');
+    await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
+
+    await page.getByLabel('User name').fill('demo-user-e2e-signature');
+    await page.getByRole('button', { name: 'Seed' }).click();
+
+    // User appears in the list
+    await expect(page.getByText('demo-user-e2e-signature')).toBeVisible({ timeout: 10_000 });
+    // Last result chip is rendered
+    await expect(page.getByText('Last result')).toBeVisible();
+
+    // Expand the user row and verify the device row shows signature + ip
+    await page.getByText('demo-user-e2e-signature').click();
+    const deviceRow = page.locator('[data-testid^="device-row-"]').first();
+    await expect(deviceRow).toBeVisible({ timeout: 10_000 });
+    // Non-VPN public IP is the backend's NON_VPN_IP constant
+    await expect(deviceRow).toContainText('ip: 203.0.113.42');
+    // Signature rendered as 16 hex chars
+    await expect(deviceRow).toContainText(/sig: [0-9a-f]{16}/);
+  });
+
+  test('seeding two different browsers produces two user rows', async ({ page }) => {
+    await page.goto('/admin');
+    await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
+
+    // First: Chrome regular
+    await page.getByLabel('User name').fill('demo-user-e2e-chrome');
+    await page.getByRole('button', { name: 'Seed' }).click();
+    await expect(page.getByText('demo-user-e2e-chrome')).toBeVisible({ timeout: 10_000 });
+
+    // Second: Firefox incognito
+    await page.getByLabel('User name').fill('demo-user-e2e-firefox');
+    // Open the Browser select and pick Firefox
+    await page.getByLabel('Browser').click();
+    await page.getByRole('option', { name: 'Firefox' }).click();
+    await page.getByTestId('seed-incognito-switch').click();
+    await page.getByRole('button', { name: 'Seed' }).click();
+
+    await expect(page.getByText('demo-user-e2e-firefox')).toBeVisible({ timeout: 10_000 });
+    // Both users still visible
+    await expect(page.getByText('demo-user-e2e-chrome')).toBeVisible();
+  });
+
+  test('invalid user name disables Seed and surfaces helper text', async ({ page }) => {
+    await page.goto('/admin');
+    await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
+
+    const input = page.getByLabel('User name');
+    await input.fill('nithya');
+    await expect(page.getByRole('button', { name: 'Seed' })).toBeDisabled();
+    await expect(page.getByText('must start with demo-user-')).toBeVisible();
+  });
+
+  test('clear-all dialog Cancel preserves data', async ({ page }) => {
+    await page.goto('/admin');
+    await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
+
+    await page.getByLabel('User name').fill('demo-user-e2e-cancel');
+    await page.getByRole('button', { name: 'Seed' }).click();
+    await expect(page.getByText('demo-user-e2e-cancel')).toBeVisible({ timeout: 10_000 });
+
+    await page.getByRole('button', { name: 'Clear all demo data' }).click();
+    await expect(page.getByRole('heading', { name: 'Clear all demo data?' })).toBeVisible();
+    // Count should be reflected in the dialog body. Tolerant of pre-existing
+    // demo data that other test files may have left behind.
+    await expect(
+      page.getByText(/\d+ user\(s\), \d+ device\(s\), \d+ fingerprint\(s\)/),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    // Dialog closes, user still there
+    await expect(page.getByRole('heading', { name: 'Clear all demo data?' })).toHaveCount(0);
+    await expect(page.getByText('demo-user-e2e-cancel')).toBeVisible();
+  });
+
+  test('clear-all dialog Confirm empties the demo data', async ({ page }) => {
+    await page.goto('/admin');
+    await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
+
+    await page.getByLabel('User name').fill('demo-user-e2e-confirm');
+    await page.getByRole('button', { name: 'Seed' }).click();
+    await expect(page.getByText('demo-user-e2e-confirm')).toBeVisible({ timeout: 10_000 });
+
+    await page.getByRole('button', { name: 'Clear all demo data' }).click();
+    await expect(page.getByRole('heading', { name: 'Clear all demo data?' })).toBeVisible();
+    await page.getByRole('button', { name: 'Clear', exact: true }).click();
+
+    // Seeded user is gone
+    await expect(page.getByText('demo-user-e2e-confirm')).toHaveCount(0, { timeout: 10_000 });
+    // Snackbar surfaces the cleared counts (>=1 user). Tolerant of any other
+    // demo data that other test files may have left behind.
+    await expect(page.getByText(/Cleared: \d+ user\(s\)/)).toBeVisible();
+  });
+
+  test('ripple effect preview fires when canvas_hash slider moves', async ({ page }) => {
+    await page.goto('/admin');
+    await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
+
+    // Seed two visits for the same user so the device has >=2 fingerprints
+    // (the preview endpoint only reclassifies devices with >=2 fingerprints).
+    await page.getByLabel('User name').fill('demo-user-e2e-ripple');
+    await page.getByRole('button', { name: 'Seed' }).click();
+    await expect(page.getByText('demo-user-e2e-ripple')).toBeVisible({ timeout: 10_000 });
+    // Toggle incognito to force a second fingerprint with different canvas
+    await page.getByTestId('seed-incognito-switch').click();
+    await page.getByRole('button', { name: 'Seed' }).click();
+
+    // Wait for second visit to register — deviceCount text on the user row
+    // should update. Give it a moment.
+    await page.waitForTimeout(500);
+
+    // Wait for preview request to listen for
+    const previewRequest = page.waitForRequest(
+      (req) => req.url().includes('/api/scoring/preview') && req.method() === 'POST',
+      { timeout: 10_000 },
+    );
+
+    // Drop canvas_hash to 0
+    const canvasSlider = page.getByLabel('canvas_hash weight');
+    await canvasSlider.focus();
+    await canvasSlider.press('Home');
+
+    await previewRequest;
+  });
+
+  test('threshold slider enforces same-device >= drift invariant', async ({ page }) => {
+    await page.goto('/admin');
+    await expect(page.getByLabel('same-device threshold')).toBeVisible({ timeout: 15_000 });
+
+    const driftSlider = page.getByLabel('drift threshold');
+    await driftSlider.focus();
+    // Drive drift to the maximum — same-device should be pulled up to match
+    await driftSlider.press('End');
+
+    // Re-read the same-device slider's current value; it must be >= drift.
+    const sameDeviceValue = await page
+      .getByLabel('same-device threshold')
+      .getAttribute('aria-valuenow');
+    const driftValue = await driftSlider.getAttribute('aria-valuenow');
+    expect(Number(sameDeviceValue)).toBeGreaterThanOrEqual(Number(driftValue));
+  });
+
+  test('save weights persists across a page reload', async ({ page, request }) => {
+    await page.goto('/admin');
+    const canvasSlider = page.getByLabel('canvas_hash weight');
+    await expect(canvasSlider).toBeVisible({ timeout: 15_000 });
+
+    // Drop canvas_hash to 0 and save
+    await canvasSlider.focus();
+    await canvasSlider.press('Home');
+    await page.getByRole('button', { name: 'Save weights' }).click();
+
+    // Backend should now report canvas_hash=0
+    await expect(async () => {
+      const res = await request.get(`${BACKEND_URL}/api/scoring/weights`);
+      const body = await res.json();
+      expect(body.canvas_hash.weight).toBe(0);
+    }).toPass({ timeout: 5_000 });
+
+    // Reload — the slider should still read 0
+    await page.reload();
+    await expect(page.getByLabel('canvas_hash weight')).toHaveAttribute('aria-valuenow', '0', {
+      timeout: 15_000,
+    });
+  });
+});

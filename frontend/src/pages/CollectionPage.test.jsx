@@ -127,7 +127,7 @@ describe('CollectionPage', () => {
     });
   });
 
-  it('renders Same Machine panel when machineMatch.matches is non-empty', async () => {
+  it('renders Same Machine heading when strongMatches is non-empty', async () => {
     const user = userEvent.setup();
     collectSignals.mockResolvedValue({ platform: 'MacIntel' });
     collectFingerprint.mockResolvedValue({
@@ -138,13 +138,53 @@ describe('CollectionPage', () => {
       score: 0,
       changedSignals: [],
       machineMatch: {
-        matches: [
+        strongMatches: [
           {
             userId: 'u2',
             userName: 'userA',
             deviceId: 'd2',
             deviceLabel: 'Chrome on MacOS',
             lastSeenAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+          },
+        ],
+        possibleMatches: [],
+      },
+    });
+
+    render(<CollectionPage />);
+    await user.type(screen.getByLabelText('Enter your name'), 'testuser');
+    await user.click(screen.getByRole('button', { name: 'Identify' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Same machine', exact: true }),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByText('Chrome on MacOS \u00B7 userA')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Matching hardware', exact: true }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders Matching Hardware heading when only possibleMatches is non-empty', async () => {
+    const user = userEvent.setup();
+    collectSignals.mockResolvedValue({ platform: 'MacIntel' });
+    collectFingerprint.mockResolvedValue({
+      userId: 'u1',
+      deviceId: 'd1',
+      deviceLabel: 'Firefox',
+      matchResult: 'NEW_DEVICE',
+      score: 0,
+      changedSignals: [],
+      machineMatch: {
+        strongMatches: [],
+        possibleMatches: [
+          {
+            userId: 'u2',
+            userName: 'userB',
+            deviceId: 'd2',
+            deviceLabel: 'Chrome on MacOS',
+            lastSeenAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
           },
         ],
       },
@@ -155,12 +195,17 @@ describe('CollectionPage', () => {
     await user.click(screen.getByRole('button', { name: 'Identify' }));
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Same machine' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'Matching hardware', exact: true }),
+      ).toBeInTheDocument();
     });
-    expect(screen.getByText('Chrome on MacOS \u00B7 userA')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Same machine', exact: true }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Chrome on MacOS \u00B7 userB')).toBeInTheDocument();
   });
 
-  it('does not render Same Machine panel when machineMatch.matches is empty', async () => {
+  it('does not render Same Machine panel when both lists are empty', async () => {
     const user = userEvent.setup();
     collectSignals.mockResolvedValue({ platform: 'MacIntel' });
     collectFingerprint.mockResolvedValue({
@@ -170,7 +215,7 @@ describe('CollectionPage', () => {
       matchResult: 'NEW_DEVICE',
       score: 0,
       changedSignals: [],
-      machineMatch: { matches: [] },
+      machineMatch: { strongMatches: [], possibleMatches: [] },
     });
 
     render(<CollectionPage />);
@@ -180,7 +225,12 @@ describe('CollectionPage', () => {
     await waitFor(() => {
       expect(screen.getByText('NEW_DEVICE')).toBeInTheDocument();
     });
-    expect(screen.queryByRole('heading', { name: 'Same machine' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Same machine', exact: true }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Matching hardware', exact: true }),
+    ).not.toBeInTheDocument();
   });
 
   it('does not render Same Machine panel when machineMatch is missing', async () => {
@@ -202,7 +252,12 @@ describe('CollectionPage', () => {
     await waitFor(() => {
       expect(screen.getByText('NEW_DEVICE')).toBeInTheDocument();
     });
-    expect(screen.queryByRole('heading', { name: 'Same machine' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Same machine', exact: true }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Matching hardware', exact: true }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows specific message when FingerprintJS is blocked by privacy extension', async () => {

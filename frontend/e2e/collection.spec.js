@@ -45,7 +45,7 @@ test.describe('Device Identification', () => {
   // frontend UI handles the machineMatch response shape correctly. We use
   // page.route rather than a live backend because real browser fingerprints
   // cannot be precisely controlled to force a machine signature match.
-  test('shows Same Machine panel when backend returns machine matches', async ({ page }) => {
+  test('shows Same Machine section when backend returns strong matches', async ({ page }) => {
     const lastSeen = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     await page.route('**/api/collect', async (route) => {
       await route.fulfill({
@@ -60,7 +60,7 @@ test.describe('Device Identification', () => {
           signalComparisons: [],
           changedSignals: [],
           machineMatch: {
-            matches: [
+            strongMatches: [
               {
                 userId: 'u1',
                 userName: 'userA',
@@ -69,6 +69,7 @@ test.describe('Device Identification', () => {
                 lastSeenAt: lastSeen,
               },
             ],
+            possibleMatches: [],
           },
         }),
       });
@@ -81,11 +82,16 @@ test.describe('Device Identification', () => {
     await expect(page.getByRole('heading', { name: 'Same machine', exact: true })).toBeVisible({
       timeout: 15_000,
     });
+    await expect(page.getByRole('heading', { name: 'Matching hardware', exact: true })).toHaveCount(
+      0,
+    );
     await expect(page.getByText('Chrome on MacOS \u00B7 userA')).toBeVisible();
-    await expect(page.getByText(/Based on device hardware and network/)).toBeVisible();
+    await expect(
+      page.getByText(/Identical hardware may match across unrelated machines/),
+    ).toBeVisible();
   });
 
-  test('hides Same Machine panel when matches list is empty', async ({ page }) => {
+  test('hides Same Machine panel when both lists are empty', async ({ page }) => {
     await page.route('**/api/collect', async (route) => {
       await route.fulfill({
         status: 200,
@@ -98,7 +104,7 @@ test.describe('Device Identification', () => {
           score: 0,
           signalComparisons: [],
           changedSignals: [],
-          machineMatch: { matches: [] },
+          machineMatch: { strongMatches: [], possibleMatches: [] },
         }),
       });
     });
@@ -109,6 +115,55 @@ test.describe('Device Identification', () => {
 
     await expect(page.getByText('NEW_DEVICE')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('heading', { name: 'Same machine', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Matching hardware', exact: true })).toHaveCount(
+      0,
+    );
+  });
+
+  test('shows Matching Hardware section when only possibleMatches is non-empty', async ({
+    page,
+  }) => {
+    const lastSeen = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    await page.route('**/api/collect', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          userId: 'u-current',
+          deviceId: 'd-current',
+          deviceLabel: 'Firefox on MacOS',
+          matchResult: 'NEW_DEVICE',
+          score: 0,
+          signalComparisons: [],
+          changedSignals: [],
+          machineMatch: {
+            strongMatches: [],
+            possibleMatches: [
+              {
+                userId: 'u1',
+                userName: 'userA',
+                deviceId: 'd1',
+                deviceLabel: 'Chrome',
+                lastSeenAt: lastSeen,
+              },
+            ],
+          },
+        }),
+      });
+    });
+
+    await page.goto('/');
+    await page.getByRole('textbox', { name: 'Enter your name' }).fill('testuser');
+    await page.getByRole('button', { name: 'Identify' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Matching hardware', exact: true })).toBeVisible(
+      { timeout: 15_000 },
+    );
+    await expect(page.getByRole('heading', { name: 'Same machine', exact: true })).toHaveCount(0);
+    await expect(
+      page.getByText(/Could be the same machine on a different Wi-Fi or VPN/),
+    ).toBeVisible();
+    await expect(page.getByText('Chrome \u00B7 userA')).toBeVisible();
   });
 
   // When a privacy extension (uBlock, Brave Shields) blocks the bundled

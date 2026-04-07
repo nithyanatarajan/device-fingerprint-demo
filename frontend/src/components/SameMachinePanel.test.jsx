@@ -2,79 +2,142 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import SameMachinePanel, { formatRelativeTime } from './SameMachinePanel';
 
+const STRONG_CAVEAT = /Other browsers seen with the same hardware/;
+const POSSIBLE_CAVEAT = /Could be the same machine on a different Wi-Fi or VPN/;
+const FOOTER_CAVEAT = /Identical hardware may match across unrelated machines/;
+
+function makeMatch(overrides = {}) {
+  return {
+    userId: 'u1',
+    userName: 'testuser',
+    deviceId: 'd1',
+    deviceLabel: 'Chrome on MacOS',
+    lastSeenAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+    ...overrides,
+  };
+}
+
 describe('SameMachinePanel', () => {
-  it('renders null when matches is undefined', () => {
+  it('renders null when both props are undefined', () => {
     const { container } = render(<SameMachinePanel />);
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders null when matches is an empty array', () => {
-    const { container } = render(<SameMachinePanel matches={[]} />);
+  it('renders null when both lists are explicitly empty', () => {
+    const { container } = render(<SameMachinePanel strongMatches={[]} possibleMatches={[]} />);
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders the title when matches is non-empty', () => {
-    const matches = [
-      {
-        userId: 'u1',
-        userName: 'testuser',
-        deviceId: 'd1',
-        deviceLabel: 'Chrome on MacOS',
-        lastSeenAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-      },
-    ];
-    render(<SameMachinePanel matches={matches} />);
-    expect(screen.getByRole('heading', { name: 'Same machine' })).toBeInTheDocument();
-  });
+  it('renders only the strong section when only strongMatches is non-empty', () => {
+    render(
+      <SameMachinePanel
+        strongMatches={[makeMatch({ userName: 'userA', deviceLabel: 'Chrome on MacOS' })]}
+        possibleMatches={[]}
+      />,
+    );
 
-  it('renders one row per match with expected primary text', () => {
-    const matches = [
-      {
-        userId: 'u1',
-        userName: 'userA',
-        deviceId: 'd1',
-        deviceLabel: 'Chrome on MacOS',
-        lastSeenAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
-      },
-      {
-        userId: 'u2',
-        userName: 'userB',
-        deviceId: 'd2',
-        deviceLabel: 'Firefox on Linux',
-        lastSeenAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-      },
-    ];
-    render(<SameMachinePanel matches={matches} />);
+    expect(screen.getByRole('heading', { name: 'Same machine', exact: true })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Matching hardware', exact: true }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText('Chrome on MacOS \u00B7 userA')).toBeInTheDocument();
+    expect(screen.queryByText(POSSIBLE_CAVEAT)).not.toBeInTheDocument();
+  });
+
+  it('renders only the possible section when only possibleMatches is non-empty', () => {
+    render(
+      <SameMachinePanel
+        strongMatches={[]}
+        possibleMatches={[
+          makeMatch({
+            userId: 'u2',
+            deviceId: 'd2',
+            userName: 'userB',
+            deviceLabel: 'Firefox on Linux',
+          }),
+        ]}
+      />,
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Matching hardware', exact: true }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Same machine', exact: true }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText('Firefox on Linux \u00B7 userB')).toBeInTheDocument();
+    expect(screen.getByText(POSSIBLE_CAVEAT)).toBeInTheDocument();
   });
 
-  it('renders relative time for each match', () => {
-    const matches = [
-      {
-        userId: 'u1',
-        userName: 'userA',
-        deviceId: 'd1',
-        deviceLabel: 'Chrome',
-        lastSeenAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-      },
-    ];
-    render(<SameMachinePanel matches={matches} />);
-    expect(screen.getByText(/minutes ago/)).toBeInTheDocument();
+  it('renders both sections when both lists are non-empty', () => {
+    render(
+      <SameMachinePanel
+        strongMatches={[
+          makeMatch({ userId: 'u1', deviceId: 'd1', userName: 'userA', deviceLabel: 'Chrome' }),
+        ]}
+        possibleMatches={[
+          makeMatch({
+            userId: 'u2',
+            deviceId: 'd2',
+            userName: 'userB',
+            deviceLabel: 'Safari on iOS',
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Same machine', exact: true })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Matching hardware', exact: true }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Chrome \u00B7 userA')).toBeInTheDocument();
+    expect(screen.getByText('Safari on iOS \u00B7 userB')).toBeInTheDocument();
   });
 
-  it('renders the footer caveat text', () => {
-    const matches = [
-      {
-        userId: 'u1',
-        userName: 'userA',
-        deviceId: 'd1',
-        deviceLabel: 'Chrome',
-        lastSeenAt: new Date().toISOString(),
-      },
-    ];
-    render(<SameMachinePanel matches={matches} />);
-    expect(screen.getByText(/Based on device hardware and network/)).toBeInTheDocument();
+  it('renders relative time for each row across both sections', () => {
+    render(
+      <SameMachinePanel
+        strongMatches={[
+          makeMatch({
+            userId: 'u1',
+            deviceId: 'd1',
+            userName: 'userA',
+            lastSeenAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+          }),
+        ]}
+        possibleMatches={[
+          makeMatch({
+            userId: 'u2',
+            deviceId: 'd2',
+            userName: 'userB',
+            lastSeenAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('5 minutes ago')).toBeInTheDocument();
+    expect(screen.getByText('3 hours ago')).toBeInTheDocument();
+  });
+
+  it('renders the strong-section caveat when strong section is shown', () => {
+    render(<SameMachinePanel strongMatches={[makeMatch()]} possibleMatches={[]} />);
+    expect(screen.getByText(STRONG_CAVEAT)).toBeInTheDocument();
+  });
+
+  it('renders the possible-section caveat when possible section is shown', () => {
+    render(<SameMachinePanel strongMatches={[]} possibleMatches={[makeMatch()]} />);
+    expect(screen.getByText(POSSIBLE_CAVEAT)).toBeInTheDocument();
+  });
+
+  it('renders the footer caveat when at least one section is shown', () => {
+    render(<SameMachinePanel strongMatches={[makeMatch()]} possibleMatches={[]} />);
+    expect(screen.getByText(FOOTER_CAVEAT)).toBeInTheDocument();
+  });
+
+  it('renders the footer caveat when only the possible section is shown', () => {
+    render(<SameMachinePanel strongMatches={[]} possibleMatches={[makeMatch()]} />);
+    expect(screen.getByText(FOOTER_CAVEAT)).toBeInTheDocument();
   });
 });
 

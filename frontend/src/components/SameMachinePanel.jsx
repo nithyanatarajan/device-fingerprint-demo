@@ -3,6 +3,7 @@ import Typography from '@mui/material/Typography';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
+import Stack from '@mui/material/Stack';
 import Box from '@mui/material/Box';
 
 export function formatRelativeTime(isoString, now = Date.now()) {
@@ -27,35 +28,61 @@ export function formatRelativeTime(isoString, now = Date.now()) {
   return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
 }
 
-export default function SameMachinePanel({ matches }) {
-  if (!matches || matches.length === 0) {
+function MatchList({ matches }) {
+  return (
+    <List dense>
+      {matches.map((match) => (
+        <ListItem key={`${match.userId}-${match.deviceId}`} disableGutters>
+          <ListItemText
+            primary={`${match.deviceLabel} \u00B7 ${match.userName}`}
+            secondary={formatRelativeTime(match.lastSeenAt)}
+          />
+        </ListItem>
+      ))}
+    </List>
+  );
+}
+
+export default function SameMachinePanel({ strongMatches, possibleMatches }) {
+  const strong = strongMatches || [];
+  const possible = possibleMatches || [];
+
+  if (strong.length === 0 && possible.length === 0) {
     return null;
   }
 
   return (
-    <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
-      <Typography variant="h6" gutterBottom>
-        Same machine
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Other browsers seen on this device and network.
-      </Typography>
-      <List dense>
-        {matches.map((match) => (
-          <ListItem key={`${match.userId}-${match.deviceId}`} disableGutters>
-            <ListItemText
-              primary={`${match.deviceLabel} \u00B7 ${match.userName}`}
-              secondary={formatRelativeTime(match.lastSeenAt)}
-            />
-          </ListItem>
-        ))}
-      </List>
-      <Box sx={{ mt: 1 }}>
+    <Stack spacing={2} sx={{ mb: 3 }}>
+      {strong.length > 0 && (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Typography variant="h6" gutterBottom>
+            Same machine
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Other browsers seen with the same hardware and on the same network.
+          </Typography>
+          <MatchList matches={strong} />
+        </Paper>
+      )}
+
+      {possible.length > 0 && (
+        <Paper variant="outlined" sx={{ p: 2, borderColor: 'warning.main', borderLeftWidth: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Matching hardware
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Same device profile from a different network. Could be the same machine on a different
+            Wi-Fi or VPN, or an unrelated machine with identical hardware.
+          </Typography>
+          <MatchList matches={possible} />
+        </Paper>
+      )}
+
+      <Box>
         <Typography variant="caption" color="text.secondary">
-          Based on device hardware and network. Identical machines on the same network may appear as
-          one.
+          Based on device hardware. Identical hardware may match across unrelated machines.
         </Typography>
       </Box>
-    </Paper>
+    </Stack>
   );
 }

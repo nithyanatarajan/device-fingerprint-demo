@@ -104,7 +104,12 @@ export default function CollectionPage() {
         </Box>
       )}
 
-      {result && <SameMachinePanel matches={result?.machineMatch?.matches} />}
+      {result && (
+        <SameMachinePanel
+          strongMatches={result?.machineMatch?.strongMatches}
+          possibleMatches={result?.machineMatch?.possibleMatches}
+        />
+      )}
 
       {signals && <SignalBreakdown signals={signals} changedSignals={result?.changedSignals} />}
     </Box>

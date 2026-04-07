@@ -5,6 +5,18 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: parseInt(process.env.VITE_PORT || '5173'),
+    // Vite 6 enforces strict Host header checking. The ngrok tunnel used by
+    // `npm run demo` serves the frontend over a public ngrok subdomain, which
+    // must be explicitly allowlisted here. Leading-dot entries match any
+    // subdomain of that root.
+    allowedHosts: [
+      'localhost',
+      '.ngrok-free.app',
+      '.ngrok-free.dev',
+      '.ngrok.app',
+      '.ngrok.dev',
+      '.ngrok.io',
+    ],
     proxy: {
       '/api': {
         target: process.env.VITE_API_URL || 'http://localhost:8080',

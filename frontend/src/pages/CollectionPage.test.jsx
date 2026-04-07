@@ -264,6 +264,29 @@ describe('CollectionPage', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('submits the form when Enter is pressed in the name field', async () => {
+    const user = userEvent.setup();
+    collectSignals.mockResolvedValue({ platform: 'MacIntel', timezone: 'UTC' });
+    collectFingerprint.mockResolvedValue({
+      userId: 'u1',
+      deviceId: 'd1',
+      deviceLabel: 'Chrome on Mac',
+      matchResult: 'NEW_DEVICE',
+      score: 0,
+      changedSignals: [],
+    });
+
+    render(<CollectionPage />);
+
+    const input = screen.getByLabelText('Enter your name');
+    await user.type(input, 'enterkey{Enter}');
+
+    await waitFor(() => {
+      expect(collectFingerprint).toHaveBeenCalled();
+    });
+    expect(collectFingerprint).toHaveBeenCalledWith(expect.objectContaining({ name: 'enterkey' }));
+  });
+
   it('shows specific message when FingerprintJS is blocked by privacy extension', async () => {
     const user = userEvent.setup();
     collectSignals.mockRejectedValue(new FingerprintBlockedError());

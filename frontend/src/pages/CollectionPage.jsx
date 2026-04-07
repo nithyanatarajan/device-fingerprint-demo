@@ -54,7 +54,12 @@ export default function CollectionPage() {
   const [signals, setSignals] = useState(null);
   const [error, setError] = useState(null);
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (event) => {
+    // Allow this to be wired both as a button onClick and a form onSubmit;
+    // when called from a form, prevent the default page reload.
+    if (event && typeof event.preventDefault === 'function') {
+      event.preventDefault();
+    }
     if (!name.trim()) return;
     setLoading(true);
     setError(null);
@@ -84,15 +89,16 @@ export default function CollectionPage() {
         Device Identification
       </Typography>
 
-      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+      <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', gap: 2, mb: 3 }}>
         <TextField
           label="Enter your name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           size="small"
           fullWidth
+          autoFocus
         />
-        <Button variant="contained" onClick={handleSubmit} disabled={loading || !name.trim()}>
+        <Button type="submit" variant="contained" disabled={loading || !name.trim()}>
           {loading ? <CircularProgress size={20} /> : 'Identify'}
         </Button>
       </Box>

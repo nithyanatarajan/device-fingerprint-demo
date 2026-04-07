@@ -17,6 +17,23 @@ const MATCH_COLORS = {
   NEW_DEVICE: 'info',
 };
 
+const MACHINE_MATCH_COLORS = {
+  SAME_MACHINE: 'success',
+  MATCHING_HARDWARE: 'warning',
+  NO_MACHINE_MATCH: 'default',
+};
+
+function machineMatchVerdict(machineMatch) {
+  if (!machineMatch) return 'NO_MACHINE_MATCH';
+  if (machineMatch.strongMatches && machineMatch.strongMatches.length > 0) {
+    return 'SAME_MACHINE';
+  }
+  if (machineMatch.possibleMatches && machineMatch.possibleMatches.length > 0) {
+    return 'MATCHING_HARDWARE';
+  }
+  return 'NO_MACHINE_MATCH';
+}
+
 function buildMessage(result) {
   const { matchResult, deviceLabel, score } = result;
   const name = result.name || result.userId;
@@ -88,10 +105,15 @@ export default function CollectionPage() {
 
       {result && (
         <Box sx={{ mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
             <Chip
               label={result.matchResult}
               color={MATCH_COLORS[result.matchResult] || 'default'}
+            />
+            <Chip
+              label={machineMatchVerdict(result.machineMatch)}
+              color={MACHINE_MATCH_COLORS[machineMatchVerdict(result.machineMatch)] || 'default'}
+              variant="outlined"
             />
             <Typography>{buildMessage(result)}</Typography>
           </Box>

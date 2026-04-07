@@ -161,6 +161,7 @@ describe('CollectionPage', () => {
       ).toBeInTheDocument();
     });
     expect(screen.getByText('Chrome on MacOS')).toBeInTheDocument();
+    expect(screen.getByText('SAME_MACHINE')).toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'Matching hardware', exact: true }),
     ).not.toBeInTheDocument();
@@ -203,6 +204,7 @@ describe('CollectionPage', () => {
       screen.queryByRole('heading', { name: 'Same machine', exact: true }),
     ).not.toBeInTheDocument();
     expect(screen.getByText('Chrome on MacOS')).toBeInTheDocument();
+    expect(screen.getByText('MATCHING_HARDWARE')).toBeInTheDocument();
   });
 
   it('does not render Same Machine panel when both lists are empty', async () => {
@@ -225,6 +227,7 @@ describe('CollectionPage', () => {
     await waitFor(() => {
       expect(screen.getByText('NEW_DEVICE')).toBeInTheDocument();
     });
+    expect(screen.getByText('NO_MACHINE_MATCH')).toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'Same machine', exact: true }),
     ).not.toBeInTheDocument();
@@ -252,6 +255,7 @@ describe('CollectionPage', () => {
     await waitFor(() => {
       expect(screen.getByText('NEW_DEVICE')).toBeInTheDocument();
     });
+    expect(screen.getByText('NO_MACHINE_MATCH')).toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'Same machine', exact: true }),
     ).not.toBeInTheDocument();

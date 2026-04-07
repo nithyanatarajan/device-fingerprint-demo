@@ -111,6 +111,7 @@ test.describe('Device Identification', () => {
     await submitName(page, 'testuser');
 
     await expect(page.getByText('SAME_DEVICE', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('SAME_MACHINE', { exact: true })).toBeVisible();
     await expect(page.getByText(/Welcome back testuser/)).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Same machine', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Matching hardware', exact: true })).toHaveCount(
@@ -132,6 +133,7 @@ test.describe('Device Identification', () => {
     await submitName(page, 'testuser');
 
     await expect(page.getByText('SAME_DEVICE', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('MATCHING_HARDWARE', { exact: true })).toBeVisible();
     await expect(page.getByText(/Welcome back testuser/)).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Matching hardware', exact: true }),
@@ -150,6 +152,7 @@ test.describe('Device Identification', () => {
     await submitName(page, 'testuser');
 
     await expect(page.getByText('SAME_DEVICE', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('NO_MACHINE_MATCH', { exact: true })).toBeVisible();
     await expect(page.getByText(/Welcome back testuser/)).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Same machine', exact: true })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Matching hardware', exact: true })).toHaveCount(
@@ -172,6 +175,7 @@ test.describe('Device Identification', () => {
     await expect(page.getByText('DRIFT_DETECTED', { exact: true })).toBeVisible({
       timeout: 15_000,
     });
+    await expect(page.getByText('SAME_MACHINE', { exact: true })).toBeVisible();
     await expect(page.getByText(/Welcome back testuser/)).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Same machine', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Matching hardware', exact: true })).toHaveCount(
@@ -195,6 +199,7 @@ test.describe('Device Identification', () => {
     await expect(page.getByText('DRIFT_DETECTED', { exact: true })).toBeVisible({
       timeout: 15_000,
     });
+    await expect(page.getByText('MATCHING_HARDWARE', { exact: true })).toBeVisible();
     await expect(page.getByText(/Welcome back testuser/)).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Matching hardware', exact: true }),
@@ -215,6 +220,7 @@ test.describe('Device Identification', () => {
     await expect(page.getByText('DRIFT_DETECTED', { exact: true })).toBeVisible({
       timeout: 15_000,
     });
+    await expect(page.getByText('NO_MACHINE_MATCH', { exact: true })).toBeVisible();
     await expect(page.getByText(/Welcome back testuser/)).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Same machine', exact: true })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Matching hardware', exact: true })).toHaveCount(
@@ -234,6 +240,7 @@ test.describe('Device Identification', () => {
     await submitName(page, 'testuser');
 
     await expect(page.getByText('NEW_DEVICE', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('NO_MACHINE_MATCH', { exact: true })).toBeVisible();
     await expect(page.getByText(/New device registered for testuser/)).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Same machine', exact: true })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Matching hardware', exact: true })).toHaveCount(

@@ -9,10 +9,16 @@ vi.mock('../services/api', () => ({
 
 vi.mock('../services/fingerprint', () => ({
   collectSignals: vi.fn(),
+  FingerprintBlockedError: class FingerprintBlockedError extends Error {
+    constructor() {
+      super('blocked');
+      this.name = 'FingerprintBlockedError';
+    }
+  },
 }));
 
 import { collectFingerprint } from '../services/api';
-import { collectSignals } from '../services/fingerprint';
+import { collectSignals, FingerprintBlockedError } from '../services/fingerprint';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -118,6 +124,20 @@ describe('CollectionPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Network error')).toBeInTheDocument();
+    });
+  });
+
+  it('shows specific message when FingerprintJS is blocked by privacy extension', async () => {
+    const user = userEvent.setup();
+    collectSignals.mockRejectedValue(new FingerprintBlockedError());
+
+    render(<CollectionPage />);
+
+    await user.type(screen.getByLabelText('Enter your name'), 'userD');
+    await user.click(screen.getByRole('button', { name: 'Identify' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/privacy extension/i)).toBeInTheDocument();
     });
   });
 });

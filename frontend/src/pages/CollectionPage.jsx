@@ -8,7 +8,7 @@ import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import SignalBreakdown from '../components/SignalBreakdown';
 import { collectFingerprint } from '../services/api';
-import { collectSignals } from '../services/fingerprint';
+import { collectSignals, FingerprintBlockedError } from '../services/fingerprint';
 
 const MATCH_COLORS = {
   SAME_DEVICE: 'success',
@@ -48,7 +48,13 @@ export default function CollectionPage() {
       const response = await collectFingerprint({ name: name.trim(), ...collected });
       setResult({ ...response, name: name.trim() });
     } catch (err) {
-      setError(err.message);
+      if (err instanceof FingerprintBlockedError) {
+        setError(
+          'Device fingerprinting could not run. A privacy extension (such as uBlock Origin or Brave Shields) may be blocking the FingerprintJS library. Disable it for this site and reload.',
+        );
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }

@@ -60,6 +60,27 @@ public class ScoringController {
   }
 
   /**
+   * Resets all signal weights to canonical defaults and returns the new state. Backs the Tuning
+   * Console's "Reset to defaults" button under Signal Weights.
+   */
+  @PostMapping("/weights/reset")
+  public Map<String, SignalWeightConfig> resetWeights() {
+    scoringConfigService.resetToDefaults();
+    return scoringConfigService.getAllWeights();
+  }
+
+  /**
+   * Resets the scoring thresholds to canonical defaults and returns the new state. Backs the Tuning
+   * Console's "Reset to defaults" button under Thresholds.
+   */
+  @PostMapping("/config/reset")
+  public ScoringThresholds resetConfig() {
+    scoringConfigService.resetToDefaults();
+    return new ScoringThresholds(
+        scoringConfigService.getSameDeviceThreshold(), scoringConfigService.getDriftThreshold());
+  }
+
+  /**
    * Re-runs Phase 1 scoring for every stored fingerprint per user with the proposed weights and
    * thresholds, and returns a per-device classification diff. Read-only — never persists the
    * proposed config or modifies any state. Drives the Tuning Console's live ripple-effect preview.

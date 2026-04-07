@@ -91,6 +91,31 @@ class ScoringControllerTest {
   }
 
   @Test
+  void postWeightsResetRestoresCanonicalDefaults() throws Exception {
+    // Pollute state first
+    scoringConfigService.updateWeights(Map.of("canvas_hash", new SignalWeightConfig(7, false)));
+
+    mockMvc
+        .perform(post("/api/scoring/weights/reset"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.canvas_hash.weight").value(90.0))
+        .andExpect(jsonPath("$.canvas_hash.enabled").value(true))
+        .andExpect(jsonPath("$.webgl_renderer.weight").value(85.0))
+        .andExpect(jsonPath("$.cookie_enabled.weight").value(5.0));
+  }
+
+  @Test
+  void postConfigResetRestoresCanonicalThresholds() throws Exception {
+    scoringConfigService.updateThresholds(33.0, 22.0);
+
+    mockMvc
+        .perform(post("/api/scoring/config/reset"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.sameDeviceThreshold").value(85.0))
+        .andExpect(jsonPath("$.driftThreshold").value(60.0));
+  }
+
+  @Test
   void postPreviewWithEmptyDatabaseReturnsEmptyUserListAndZeroSummary() throws Exception {
     mockMvc
         .perform(

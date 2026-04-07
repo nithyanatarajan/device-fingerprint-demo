@@ -4,6 +4,7 @@ import com.example.deviceid.dto.AdminSeedRequest;
 import com.example.deviceid.dto.AdminSeedSummary;
 import com.example.deviceid.dto.CollectResponse;
 import com.example.deviceid.service.AdminSeedService;
+import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -41,5 +42,15 @@ public class AdminSeedController {
   @DeleteMapping
   public AdminSeedSummary clearAll() {
     return adminSeedService.clearAll();
+  }
+
+  /**
+   * Wipes existing demo data and seeds a curated 5-user scenario designed to make the Tuning
+   * Console's slider drags produce visible classification flips. Returns the live {@link
+   * CollectResponse} of each second visit so the audience can watch the scenario land.
+   */
+  @PostMapping("/scenario")
+  public List<CollectResponse> seedScenario() {
+    return adminSeedService.seedScenario();
   }
 }

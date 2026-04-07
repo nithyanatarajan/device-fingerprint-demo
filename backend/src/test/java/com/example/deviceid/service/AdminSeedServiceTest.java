@@ -84,6 +84,32 @@ class AdminSeedServiceTest {
   }
 
   @Test
+  void seedScenarioCreatesFiveCuratedUsersEachWithTwoFingerprintsOnOneDevice() {
+    var outcomes = adminSeedService.seedScenario();
+
+    assertThat(outcomes).hasSize(5);
+
+    AdminSeedSummary summary = adminSeedService.summary();
+    assertThat(summary.users()).isEqualTo(5);
+    // Each scenario produces 2 fingerprints that match into the same device, so users == devices.
+    assertThat(summary.devices()).isEqualTo(5);
+    assertThat(summary.fingerprints()).isEqualTo(10);
+  }
+
+  @Test
+  void seedScenarioWipesExistingDemoDataFirst() {
+    adminSeedService.seed(new AdminSeedRequest("demo-user-pre-existing", "chrome", false, false));
+    assertThat(adminSeedService.summary().users()).isEqualTo(1);
+
+    adminSeedService.seedScenario();
+
+    AdminSeedSummary summary = adminSeedService.summary();
+    assertThat(summary.users()).isEqualTo(5);
+    // The pre-existing user is gone
+    assertThat(summary.users() == 5 && adminSeedService.summary().devices() == 5).isTrue();
+  }
+
+  @Test
   void clearAllDeletesAllDemoUsersAndReturnsCounts() {
     adminSeedService.seed(new AdminSeedRequest("demo-user-alpha", "chrome", false, false));
     adminSeedService.seed(new AdminSeedRequest("demo-user-beta", "firefox", false, false));

@@ -11,8 +11,10 @@ import com.example.deviceid.repository.DeviceRepository;
 import com.example.deviceid.repository.UserRepository;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.UnaryOperator;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -69,6 +71,138 @@ public class AdminSeedService {
     CollectRequest withName = withName(template, userName);
     String publicIp = request.vpn() ? VPN_IP : NON_VPN_IP;
     return collectionService.collect(withName, publicIp);
+  }
+
+  /**
+   * Curated scenario for {@link #seedScenario}. Each scenario produces one user with two
+   * fingerprints attached to a single device, designed to land at a specific point on the score
+   * curve so the Tuning Console's sliders produce visible flips when dragged.
+   */
+  private record Scenario(String userName, UnaryOperator<CollectRequest> mutateSecondVisit) {}
+
+  // Distinct field values used by the curated scenarios. Each is intentionally far enough from
+  // the chrome-regular template that the SignalComparator scores it as a full mismatch (no
+  // partial match), so the math in the scenario score predictions is clean.
+  private static final String DIFFERENT_CANVAS_HASH = "DIFFERENT_HASH";
+  private static final String DIFFERENT_WEBGL_RENDERER = "Mesa Intel HD Graphics 4000";
+  private static final String DIFFERENT_USER_AGENT =
+      "Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0";
+  private static final String DIFFERENT_CODEC_SUPPORT = "audio/mp4;codecs=mp4a.40.2";
+  private static final String DIFFERENT_PLATFORM = "Win32";
+
+  // Total default weight = 90+85+70+60+50+50+45+40+35+30+20+15+15+10+5 = 620
+  // Approximate scores under default weights:
+  //   stable        — all match           → 100.0  (SAME_DEVICE)
+  //   canvas-drift  — canvas (90)         →  85.5  (SAME_DEVICE, on the cusp)
+  //   cross-browser — canvas+webgl (175)  →  71.8  (DRIFT_DETECTED)
+  //   os-update     — canvas+ua+codec     →  75.0  (DRIFT_DETECTED)
+  //   major-drift   — canvas+webgl+plat   →  62.1  (DRIFT_DETECTED, just above drift threshold)
+  private static final List<Scenario> SCENARIOS =
+      List.of(
+          new Scenario("demo-user-stable", req -> req),
+          new Scenario(
+              "demo-user-canvas-drift",
+              req ->
+                  new CollectRequest(
+                      req.name(),
+                      DIFFERENT_CANVAS_HASH,
+                      req.webglRenderer(),
+                      req.screenResolution(),
+                      req.colorDepth(),
+                      req.pixelRatio(),
+                      req.timezone(),
+                      req.locale(),
+                      req.platform(),
+                      req.userAgent(),
+                      req.hardwareConcurrency(),
+                      req.deviceMemory(),
+                      req.touchSupport(),
+                      req.codecSupport(),
+                      req.dntEnabled(),
+                      req.cookieEnabled(),
+                      req.fontHash())),
+          new Scenario(
+              "demo-user-cross-browser",
+              req ->
+                  new CollectRequest(
+                      req.name(),
+                      DIFFERENT_CANVAS_HASH,
+                      DIFFERENT_WEBGL_RENDERER,
+                      req.screenResolution(),
+                      req.colorDepth(),
+                      req.pixelRatio(),
+                      req.timezone(),
+                      req.locale(),
+                      req.platform(),
+                      req.userAgent(),
+                      req.hardwareConcurrency(),
+                      req.deviceMemory(),
+                      req.touchSupport(),
+                      req.codecSupport(),
+                      req.dntEnabled(),
+                      req.cookieEnabled(),
+                      req.fontHash())),
+          new Scenario(
+              "demo-user-os-update",
+              req ->
+                  new CollectRequest(
+                      req.name(),
+                      DIFFERENT_CANVAS_HASH,
+                      req.webglRenderer(),
+                      req.screenResolution(),
+                      req.colorDepth(),
+                      req.pixelRatio(),
+                      req.timezone(),
+                      req.locale(),
+                      req.platform(),
+                      DIFFERENT_USER_AGENT,
+                      req.hardwareConcurrency(),
+                      req.deviceMemory(),
+                      req.touchSupport(),
+                      DIFFERENT_CODEC_SUPPORT,
+                      req.dntEnabled(),
+                      req.cookieEnabled(),
+                      req.fontHash())),
+          new Scenario(
+              "demo-user-major-drift",
+              req ->
+                  new CollectRequest(
+                      req.name(),
+                      DIFFERENT_CANVAS_HASH,
+                      DIFFERENT_WEBGL_RENDERER,
+                      req.screenResolution(),
+                      req.colorDepth(),
+                      req.pixelRatio(),
+                      req.timezone(),
+                      req.locale(),
+                      DIFFERENT_PLATFORM,
+                      req.userAgent(),
+                      req.hardwareConcurrency(),
+                      req.deviceMemory(),
+                      req.touchSupport(),
+                      req.codecSupport(),
+                      req.dntEnabled(),
+                      req.cookieEnabled(),
+                      req.fontHash())));
+
+  /**
+   * Wipes existing demo data and seeds a curated scenario of 5 users designed to sit at varied
+   * points on the score curve. Each user has two fingerprints on one device so the preview service
+   * can score them, and dragging high-leverage sliders (canvas_hash, webgl_renderer, platform)
+   * produces visible classification flips. Returns the {@link CollectResponse} of each second visit
+   * (the scoring outcome the audience watches happen).
+   */
+  public List<CollectResponse> seedScenario() {
+    clearAll();
+    CollectRequest base = loadTemplate("chrome", false);
+    List<CollectResponse> outcomes = new ArrayList<>();
+    for (Scenario scenario : SCENARIOS) {
+      CollectRequest firstVisit = withName(base, scenario.userName());
+      collectionService.collect(firstVisit, NON_VPN_IP);
+      CollectRequest secondVisit = scenario.mutateSecondVisit().apply(firstVisit);
+      outcomes.add(collectionService.collect(secondVisit, NON_VPN_IP));
+    }
+    return outcomes;
   }
 
   /** Returns counts of all {@code demo-user-*} data currently stored. */

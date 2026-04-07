@@ -19,6 +19,22 @@ A full-stack device fingerprinting and identification management platform built 
 - Node.js 22+
 - Gradle 9.0+
 
+## Environment variables
+
+If you use [direnv](https://direnv.net/), copy `envrc.sample` to `.envrc` and run `direnv allow`. The sample sets:
+
+- `DATABASE_URL` and `DDL_AUTO` — switch the backend to persistent file-mode H2 so seeded data survives restarts (see [Persistent mode](#backend) below).
+- `NGROK_AUTHTOKEN` — optional override for the ngrok auth token used by `npm run demo`. Commented out by default; uncomment and fill in if you don't already have a standalone `ngrok` CLI config.
+
+```bash
+cp envrc.sample .envrc
+direnv allow
+```
+
+`.envrc` is gitignored (`.env*`) so your local copy stays out of version control. Without direnv you can `source envrc.sample` manually, or just paste the `export` lines into your shell.
+
+The full list of recognised env vars is in the [Environment Variables](#environment-variables) reference at the bottom.
+
 ## Getting Started
 
 ### Backend

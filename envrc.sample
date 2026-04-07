@@ -1,0 +1,23 @@
+# Sample .envrc for direnv users.
+#
+# Copy to .envrc at the project root and run `direnv allow`. The .envrc
+# itself is gitignored (see .gitignore: `.env*`), so it stays local.
+#
+#   cp envrc.sample .envrc
+#   direnv allow
+
+# --- Backend persistent mode ----------------------------------------------
+# Default backend datasource is in-memory H2; every restart wipes the DB.
+# Set both vars below to switch to file-mode H2 so seeded data and ngrok
+# demo state survive across `./gradlew bootRun` restarts. The file lives at
+# backend/data/deviceid.mv.db (gitignored). AUTO_SERVER=TRUE lets multiple
+# JVMs share the file (e.g. running tests while bootRun is up).
+export DATABASE_URL='jdbc:h2:file:./data/deviceid;AUTO_SERVER=TRUE'
+export DDL_AUTO=update
+
+# --- ngrok demo tunnel ----------------------------------------------------
+# Used by `npm run demo` to expose the local frontend over a public ngrok
+# URL. Optional — the script also reads the standalone ngrok CLI config
+# file written by `ngrok config add-authtoken <token>`. Set this only if
+# you want the env var to take precedence over the config file.
+# export NGROK_AUTHTOKEN='your-ngrok-token-here'

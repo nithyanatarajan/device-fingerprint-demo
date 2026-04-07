@@ -57,11 +57,41 @@ cd backend
 
 ```bash
 cd frontend
-npm run lint           # ESLint
-npm run format:check   # Prettier
-npm test               # Vitest
+npm run check          # lint + format check
+npm run fix            # auto-fix lint + format
+npm test               # Vitest unit tests
 npm run test:coverage  # with coverage
+npm run ci             # full CI: check + build + test:coverage
 ```
+
+#### End-to-end tests (Playwright)
+
+E2E tests exercise the full flow: browser → FingerprintJS → backend. They require the backend to be running:
+
+```bash
+# Terminal 1
+cd backend && ./gradlew bootRun
+
+# Terminal 2
+cd frontend
+npx playwright install chromium        # one-time browser install
+npm run test:e2e                       # runs against chromium (default)
+npm run test:e2e:all                   # runs across chromium + firefox + webkit
+npm run test:e2e -- --project=firefox  # single non-default browser
+```
+
+##### Debugging E2E failures
+
+```bash
+npm run test:e2e -- --headed           # watch the browser run
+npm run test:e2e -- --debug            # step through with Playwright Inspector
+npm run test:e2e -- --ui               # interactive UI mode (best DX)
+
+npx playwright show-report             # open the HTML report from the last run
+npx playwright show-trace test-results/<name>/trace.zip  # view a recorded trace
+```
+
+On failure, the config automatically captures: trace (timeline + DOM snapshots + network), screenshot, and video. They land in `test-results/` and `playwright-report/`.
 
 ## Environment Variables
 

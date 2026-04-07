@@ -5,6 +5,9 @@ import reactHooks from 'eslint-plugin-react-hooks';
 export default [
   js.configs.recommended,
   {
+    ignores: ['dist/**', 'coverage/**', 'node_modules/**', 'playwright-report/**', 'test-results/**'],
+  },
+  {
     files: ['**/*.{js,jsx}'],
     plugins: {
       react,
@@ -37,6 +40,14 @@ export default [
       ...react.configs['jsx-runtime'].rules,
       ...reactHooks.configs.recommended.rules,
       'react/prop-types': 'off',
+    },
+  },
+  {
+    files: ['e2e/**/*.{js,jsx}', 'playwright.config.js', 'vite.config.js'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+      },
     },
   },
 ];

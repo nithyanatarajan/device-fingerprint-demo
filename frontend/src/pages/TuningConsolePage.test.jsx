@@ -1,6 +1,13 @@
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import TuningConsolePage from './TuningConsolePage';
+
+vi.mock('../services/api', () => ({
+  getScoringWeights: vi.fn().mockResolvedValue({}),
+  updateScoringWeights: vi.fn(),
+  getScoringConfig: vi.fn().mockResolvedValue({ sameDeviceThreshold: 85, driftThreshold: 60 }),
+  updateScoringConfig: vi.fn(),
+}));
 
 describe('TuningConsolePage', () => {
   it('renders the page title', () => {

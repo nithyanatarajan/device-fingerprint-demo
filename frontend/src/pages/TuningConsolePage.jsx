@@ -3,6 +3,7 @@ import Stack from '@mui/material/Stack';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import WeightSliders from '../components/WeightSliders';
+import ThresholdSliders from '../components/ThresholdSliders';
 
 function Section({ title, children }) {
   return (
@@ -26,7 +27,9 @@ export default function TuningConsolePage() {
         <Section title="Signal Weights">
           <WeightSliders />
         </Section>
-        <Section title="Thresholds" />
+        <Section title="Thresholds">
+          <ThresholdSliders />
+        </Section>
         <Section title="Users & Devices" />
         <Section title="Live Preview Summary" />
       </Stack>

@@ -24,6 +24,55 @@ const TRANSITION_BG = {
   UNCHANGED: 'transparent',
 };
 
+function formatScore(value) {
+  if (value == null || Number.isNaN(value)) return '—';
+  return value.toFixed(1);
+}
+
+function ScoreDisplay({ previewDevice }) {
+  // No preview data yet (hook hasn't fired) → render a placeholder so the
+  // layout doesn't shift when the data lands.
+  if (!previewDevice) {
+    return (
+      <Typography variant="caption" color="text.disabled" data-testid="device-score">
+        score: —
+      </Typography>
+    );
+  }
+
+  const { currentScore, proposedScore, transition } = previewDevice;
+  const moved = Math.abs((proposedScore ?? 0) - (currentScore ?? 0)) >= 0.05;
+
+  if (!moved) {
+    return (
+      <Typography variant="caption" sx={{ fontFamily: 'monospace' }} data-testid="device-score">
+        score: <strong>{formatScore(currentScore)}</strong>
+      </Typography>
+    );
+  }
+
+  const color =
+    transition === 'PROMOTED'
+      ? 'success.main'
+      : transition === 'DEMOTED'
+        ? 'error.main'
+        : 'warning.main';
+
+  return (
+    <Typography variant="caption" sx={{ fontFamily: 'monospace' }} data-testid="device-score">
+      score:{' '}
+      <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>
+        {formatScore(currentScore)}
+      </span>{' '}
+      → <strong style={{ color: 'inherit' }}>{formatScore(proposedScore)}</strong>{' '}
+      <Box component="span" sx={{ color, fontWeight: 700 }}>
+        ({proposedScore > currentScore ? '+' : ''}
+        {(proposedScore - currentScore).toFixed(1)})
+      </Box>
+    </Typography>
+  );
+}
+
 function DeviceRow({ device, previewDevice }) {
   const transition = previewDevice?.transition || 'UNCHANGED';
   return (
@@ -42,6 +91,7 @@ function DeviceRow({ device, previewDevice }) {
         {device.label}
       </Typography>
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 0.5 }}>
+        <ScoreDisplay previewDevice={previewDevice} />
         <Typography
           variant="caption"
           sx={{

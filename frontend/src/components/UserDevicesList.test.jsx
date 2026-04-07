@@ -160,6 +160,62 @@ describe('UserDevicesList', () => {
     expect(screen.getByTestId('device-row-d1')).toHaveAttribute('data-transition', 'UNCHANGED');
   });
 
+  it('renders score placeholder when no preview data is available', async () => {
+    getUsers.mockResolvedValue([{ id: 'u1', name: 'alice', deviceCount: 1 }]);
+    getUserDevices.mockResolvedValue([
+      { id: 'd1', label: 'Chrome', visitCount: 1, machineSignature: 'a', publicIp: 'b' },
+    ]);
+
+    render(<UserDevicesList />);
+    await waitFor(() => expect(screen.getByText('Chrome')).toBeInTheDocument());
+    expect(screen.getByTestId('device-score')).toHaveTextContent('score: —');
+  });
+
+  it('renders the static score when preview data has no delta', async () => {
+    getUsers.mockResolvedValue([{ id: 'u1', name: 'alice', deviceCount: 1 }]);
+    getUserDevices.mockResolvedValue([
+      { id: 'd1', label: 'Chrome', visitCount: 1, machineSignature: 'a', publicIp: 'b' },
+    ]);
+    const previewByDeviceId = {
+      d1: {
+        deviceId: 'd1',
+        currentClassification: 'SAME_DEVICE',
+        proposedClassification: 'SAME_DEVICE',
+        currentScore: 87.5,
+        proposedScore: 87.5,
+        transition: 'UNCHANGED',
+      },
+    };
+
+    render(<UserDevicesList previewByDeviceId={previewByDeviceId} />);
+    await waitFor(() => expect(screen.getByText('Chrome')).toBeInTheDocument());
+    expect(screen.getByTestId('device-score')).toHaveTextContent('score: 87.5');
+  });
+
+  it('renders the before → after score with delta when preview shifts the score', async () => {
+    getUsers.mockResolvedValue([{ id: 'u1', name: 'alice', deviceCount: 1 }]);
+    getUserDevices.mockResolvedValue([
+      { id: 'd1', label: 'Chrome', visitCount: 1, machineSignature: 'a', publicIp: 'b' },
+    ]);
+    const previewByDeviceId = {
+      d1: {
+        deviceId: 'd1',
+        currentClassification: 'SAME_DEVICE',
+        proposedClassification: 'DRIFT_DETECTED',
+        currentScore: 90.2,
+        proposedScore: 42.1,
+        transition: 'DEMOTED',
+      },
+    };
+
+    render(<UserDevicesList previewByDeviceId={previewByDeviceId} />);
+    await waitFor(() => expect(screen.getByText('Chrome')).toBeInTheDocument());
+    const score = screen.getByTestId('device-score');
+    expect(score).toHaveTextContent('90.2');
+    expect(score).toHaveTextContent('42.1');
+    expect(score).toHaveTextContent('-48.1');
+  });
+
   it('shows per-user device-fetch error', async () => {
     getUsers.mockResolvedValue([{ id: 'u1', name: 'alice', deviceCount: 1 }]);
     getUserDevices.mockRejectedValue(new Error('device boom'));

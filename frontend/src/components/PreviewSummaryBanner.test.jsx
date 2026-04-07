@@ -3,24 +3,46 @@ import { describe, it, expect } from 'vitest';
 import PreviewSummaryBanner from './PreviewSummaryBanner';
 
 describe('PreviewSummaryBanner', () => {
-  it('renders nothing when summary is null', () => {
-    const { container } = render(<PreviewSummaryBanner summary={null} />);
-    expect(container.firstChild).toBeNull();
+  it('renders the idle hint when summary is null', () => {
+    render(<PreviewSummaryBanner summary={null} />);
+    expect(screen.getByTestId('preview-summary-banner')).toBeInTheDocument();
+    expect(screen.getByText(/Drag any weight or threshold slider/)).toBeInTheDocument();
   });
 
-  it('renders nothing when affectedDevices is 0', () => {
-    const { container } = render(
-      <PreviewSummaryBanner summary={{ affectedDevices: 0, promotedCount: 0, demotedCount: 0 }} />,
+  it('renders a "no impact" state when affectedDevices is 0', () => {
+    render(
+      <PreviewSummaryBanner
+        summary={{
+          totalUsers: 2,
+          totalDevices: 3,
+          totalFingerprints: 5,
+          affectedDevices: 0,
+          promotedCount: 0,
+          demotedCount: 0,
+        }}
+      />,
     );
-    expect(container.firstChild).toBeNull();
+    expect(screen.getByText(/no impact/)).toBeInTheDocument();
+    expect(screen.getByText(/3 device\(s\)/)).toBeInTheDocument();
   });
 
   it('renders the affected counts', () => {
     render(
-      <PreviewSummaryBanner summary={{ affectedDevices: 4, promotedCount: 3, demotedCount: 1 }} />,
+      <PreviewSummaryBanner
+        summary={{
+          totalUsers: 1,
+          totalDevices: 4,
+          totalFingerprints: 8,
+          affectedDevices: 4,
+          promotedCount: 3,
+          demotedCount: 1,
+        }}
+      />,
     );
-    expect(screen.getByTestId('preview-summary-banner')).toHaveTextContent(
-      'This change affects 4 device(s). 3 promoted, 1 demoted.',
-    );
+    const banner = screen.getByTestId('preview-summary-banner');
+    expect(banner).toHaveTextContent(/4 device\(s\) affected/);
+    expect(banner).toHaveTextContent(/3 promoted/);
+    expect(banner).toHaveTextContent(/1 demoted/);
+    expect(banner).toHaveTextContent(/8 fingerprint\(s\) evaluated/);
   });
 });

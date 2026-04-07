@@ -30,23 +30,21 @@ describe('TuningConsolePage', () => {
     expect(screen.getByRole('heading', { name: 'Tuning Console', level: 4 })).toBeInTheDocument();
   });
 
-  it('renders all five section headings', () => {
+  it('renders the four primary section headings', () => {
     render(<TuningConsolePage />);
-    expect(screen.getByRole('heading', { name: 'Demo Data', level: 6 })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Signal Weights', level: 6 })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Thresholds', level: 6 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Demo Data', level: 6 })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Users & Devices', level: 6 })).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'Live Preview Summary', level: 6 }),
-    ).toBeInTheDocument();
   });
 
-  it('shows "adjust a slider" hint when there is no preview yet', () => {
+  it('shows the idle preview hint when there is no preview yet', () => {
     render(<TuningConsolePage />);
-    expect(screen.getByText('Adjust a slider to preview impact.')).toBeInTheDocument();
+    expect(screen.getByTestId('preview-summary-banner')).toBeInTheDocument();
+    expect(screen.getByText(/Drag any weight or threshold slider/)).toBeInTheDocument();
   });
 
-  it('renders preview summary text when slider state triggers a preview', async () => {
+  it('shows affected count when preview returns affected devices', async () => {
     getScoringWeights.mockResolvedValue({ canvas_hash: { weight: 90, enabled: true } });
     previewScoring.mockResolvedValue({
       users: [
@@ -85,10 +83,8 @@ describe('TuningConsolePage', () => {
     });
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/1 user\(s\), 1 device\(s\), 2 fingerprint\(s\)\. Affected: 1\./),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/1 device\(s\) affected/)).toBeInTheDocument();
     });
-    expect(screen.getByTestId('preview-summary-banner')).toBeInTheDocument();
+    expect(screen.getByText(/1 promoted/)).toBeInTheDocument();
   });
 });

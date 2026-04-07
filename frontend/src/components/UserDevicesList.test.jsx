@@ -20,6 +20,7 @@ describe('UserDevicesList', () => {
       { id: 'u1', name: 'alice', deviceCount: 2 },
       { id: 'u2', name: 'bob', deviceCount: 1 },
     ]);
+    getUserDevices.mockResolvedValue([]);
 
     render(<UserDevicesList />);
 
@@ -31,8 +32,7 @@ describe('UserDevicesList', () => {
     expect(screen.getByText('1 device(s)')).toBeInTheDocument();
   });
 
-  it('expands user on click and fetches devices', async () => {
-    const user = userEvent.setup();
+  it('eagerly loads devices for every user without requiring a click', async () => {
     getUsers.mockResolvedValue([{ id: 'u1', name: 'alice', deviceCount: 1 }]);
     getUserDevices.mockResolvedValue([
       {
@@ -47,12 +47,7 @@ describe('UserDevicesList', () => {
 
     render(<UserDevicesList />);
 
-    await waitFor(() => {
-      expect(screen.getByText('alice')).toBeInTheDocument();
-    });
-
-    await user.click(screen.getByText('alice'));
-
+    // Devices visible WITHOUT any click — auto-expand on load.
     await waitFor(() => {
       expect(screen.getByText('Chrome on Mac')).toBeInTheDocument();
     });
@@ -63,7 +58,6 @@ describe('UserDevicesList', () => {
   });
 
   it('shows null sig and ip when missing', async () => {
-    const user = userEvent.setup();
     getUsers.mockResolvedValue([{ id: 'u1', name: 'alice', deviceCount: 1 }]);
     getUserDevices.mockResolvedValue([
       {
@@ -77,16 +71,13 @@ describe('UserDevicesList', () => {
     ]);
 
     render(<UserDevicesList />);
-    await waitFor(() => expect(screen.getByText('alice')).toBeInTheDocument());
-    await user.click(screen.getByText('alice'));
-
     await waitFor(() => {
       expect(screen.getByText(/sig: null/)).toBeInTheDocument();
     });
     expect(screen.getByText(/ip: null/)).toBeInTheDocument();
   });
 
-  it('toggles closed on second click', async () => {
+  it('collapses on click after auto-expand', async () => {
     const user = userEvent.setup();
     getUsers.mockResolvedValue([{ id: 'u1', name: 'alice', deviceCount: 1 }]);
     getUserDevices.mockResolvedValue([
@@ -94,13 +85,10 @@ describe('UserDevicesList', () => {
     ]);
 
     render(<UserDevicesList />);
-    await waitFor(() => expect(screen.getByText('alice')).toBeInTheDocument());
-
-    await user.click(screen.getByText('alice'));
     await waitFor(() => expect(screen.getByText('Chrome')).toBeInTheDocument());
 
     await user.click(screen.getByText('alice'));
-    // Collapse hides via animation but since unmountOnExit, eventually unmounts
+    // Collapse hides via animation; with unmountOnExit it eventually unmounts
     await waitFor(() => {
       expect(screen.queryByText('Chrome')).not.toBeInTheDocument();
     });
@@ -110,7 +98,7 @@ describe('UserDevicesList', () => {
     getUsers.mockResolvedValue([]);
     render(<UserDevicesList />);
     await waitFor(() => {
-      expect(screen.getByText('No users yet.')).toBeInTheDocument();
+      expect(screen.getByText(/No users yet/)).toBeInTheDocument();
     });
   });
 
@@ -123,7 +111,6 @@ describe('UserDevicesList', () => {
   });
 
   it('highlights rows by transition based on previewByDeviceId', async () => {
-    const user = userEvent.setup();
     getUsers.mockResolvedValue([{ id: 'u1', name: 'alice', deviceCount: 2 }]);
     getUserDevices.mockResolvedValue([
       { id: 'd1', label: 'Chrome', visitCount: 1, machineSignature: 'a', publicIp: 'b' },
@@ -145,22 +132,16 @@ describe('UserDevicesList', () => {
     };
 
     render(<UserDevicesList previewByDeviceId={previewByDeviceId} />);
-    await waitFor(() => expect(screen.getByText('alice')).toBeInTheDocument());
-    await user.click(screen.getByText('alice'));
+    await waitFor(() => expect(screen.getByText('Chrome')).toBeInTheDocument());
 
-    await waitFor(() => {
-      expect(screen.getByText('Chrome')).toBeInTheDocument();
-    });
     expect(screen.getByTestId('device-row-d1')).toHaveAttribute('data-transition', 'PROMOTED');
     expect(screen.getByTestId('device-row-d2')).toHaveAttribute('data-transition', 'DEMOTED');
-    // chips for old → new visible
     expect(screen.getAllByText('NEW_DEVICE').length).toBeGreaterThan(0);
     expect(screen.getAllByText('SAME_DEVICE').length).toBeGreaterThan(0);
     expect(screen.getByText('DRIFT_DETECTED')).toBeInTheDocument();
   });
 
   it('does not highlight UNCHANGED rows', async () => {
-    const user = userEvent.setup();
     getUsers.mockResolvedValue([{ id: 'u1', name: 'alice', deviceCount: 1 }]);
     getUserDevices.mockResolvedValue([
       { id: 'd1', label: 'Chrome', visitCount: 1, machineSignature: 'a', publicIp: 'b' },
@@ -175,22 +156,15 @@ describe('UserDevicesList', () => {
     };
 
     render(<UserDevicesList previewByDeviceId={previewByDeviceId} />);
-    await waitFor(() => expect(screen.getByText('alice')).toBeInTheDocument());
-    await user.click(screen.getByText('alice'));
-    await waitFor(() => {
-      expect(screen.getByText('Chrome')).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.getByText('Chrome')).toBeInTheDocument());
     expect(screen.getByTestId('device-row-d1')).toHaveAttribute('data-transition', 'UNCHANGED');
   });
 
-  it('shows device-fetch error', async () => {
-    const user = userEvent.setup();
+  it('shows per-user device-fetch error', async () => {
     getUsers.mockResolvedValue([{ id: 'u1', name: 'alice', deviceCount: 1 }]);
     getUserDevices.mockRejectedValue(new Error('device boom'));
 
     render(<UserDevicesList />);
-    await waitFor(() => expect(screen.getByText('alice')).toBeInTheDocument());
-    await user.click(screen.getByText('alice'));
     await waitFor(() => {
       expect(screen.getByText('device boom')).toBeInTheDocument();
     });

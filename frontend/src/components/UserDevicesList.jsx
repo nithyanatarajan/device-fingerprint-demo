@@ -83,36 +83,60 @@ export default function UserDevicesList({ refreshKey = 0, previewByDeviceId = {}
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [expandedUserId, setExpandedUserId] = useState(null);
+  const [collapsedUserIds, setCollapsedUserIds] = useState(() => new Set());
   const [devicesByUser, setDevicesByUser] = useState({});
-  const [deviceLoading, setDeviceLoading] = useState({});
   const [deviceError, setDeviceError] = useState({});
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
+    setError(null);
+
     getUsers()
-      .then((data) => setUsers(data))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+      .then(async (loadedUsers) => {
+        if (cancelled) return;
+        setUsers(loadedUsers);
+
+        // Eagerly fetch devices for every user so the list is fully expanded
+        // when the page loads. This makes the Ripple Effect highlights
+        // visible without requiring a click.
+        const results = await Promise.allSettled(
+          loadedUsers.map((u) => getUserDevices(u.id).then((devices) => [u.id, devices])),
+        );
+        if (cancelled) return;
+
+        const nextDevices = {};
+        const nextErrors = {};
+        results.forEach((result, idx) => {
+          const userId = loadedUsers[idx].id;
+          if (result.status === 'fulfilled') {
+            nextDevices[userId] = result.value[1];
+          } else {
+            nextErrors[userId] = result.reason?.message || 'Failed to load devices';
+          }
+        });
+        setDevicesByUser(nextDevices);
+        setDeviceError(nextErrors);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [refreshKey]);
 
-  const toggle = async (userId) => {
-    if (expandedUserId === userId) {
-      setExpandedUserId(null);
-      return;
-    }
-    setExpandedUserId(userId);
-    if (devicesByUser[userId]) return;
-    setDeviceLoading((prev) => ({ ...prev, [userId]: true }));
-    setDeviceError((prev) => ({ ...prev, [userId]: null }));
-    try {
-      const devices = await getUserDevices(userId);
-      setDevicesByUser((prev) => ({ ...prev, [userId]: devices }));
-    } catch (err) {
-      setDeviceError((prev) => ({ ...prev, [userId]: err.message }));
-    } finally {
-      setDeviceLoading((prev) => ({ ...prev, [userId]: false }));
-    }
+  const toggle = (userId) => {
+    setCollapsedUserIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
   };
 
   if (loading) return <CircularProgress size={24} />;
@@ -120,7 +144,7 @@ export default function UserDevicesList({ refreshKey = 0, previewByDeviceId = {}
   if (users.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary">
-        No users yet.
+        No users yet. Use Demo Data above to seed some.
       </Typography>
     );
   }
@@ -128,9 +152,9 @@ export default function UserDevicesList({ refreshKey = 0, previewByDeviceId = {}
   return (
     <List dense>
       {users.map((user) => {
-        const isOpen = expandedUserId === user.id;
+        const isOpen = !collapsedUserIds.has(user.id);
         return (
-          <Box key={user.id}>
+          <Box key={user.id} data-testid={`user-section-${user.name}`}>
             <ListItem disablePadding>
               <ListItemButton onClick={() => toggle(user.id)}>
                 <ListItemText primary={user.name} secondary={`${user.deviceCount} device(s)`} />
@@ -139,7 +163,6 @@ export default function UserDevicesList({ refreshKey = 0, previewByDeviceId = {}
             </ListItem>
             <Collapse in={isOpen} timeout="auto" unmountOnExit>
               <Box sx={{ pl: 2, pr: 2, pb: 1 }}>
-                {deviceLoading[user.id] && <CircularProgress size={20} />}
                 {deviceError[user.id] && <Alert severity="error">{deviceError[user.id]}</Alert>}
                 {devicesByUser[user.id] &&
                   devicesByUser[user.id].map((device) => (

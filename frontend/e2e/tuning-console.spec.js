@@ -23,6 +23,13 @@ import { test, expect } from '@playwright/test';
 
 const BACKEND_URL = process.env.E2E_BACKEND_URL || 'http://localhost:8080';
 
+async function openDemoDataAccordion(page) {
+  // Demo Data is collapsed by default in the redesigned layout. Click the
+  // accordion summary button to expand it before interacting with the form.
+  await page.getByRole('button', { name: 'Demo Data' }).click();
+  await expect(page.getByLabel('User name')).toBeVisible({ timeout: 5_000 });
+}
+
 async function cleanup(request) {
   try {
     await request.delete(`${BACKEND_URL}/api/admin/seed`);
@@ -70,21 +77,24 @@ test.describe('Tuning Console', () => {
     await resetScoringDefaults(request);
   });
 
-  test('renders all five sections at /admin', async ({ page }) => {
+  test('renders the four primary sections and the sticky preview banner at /admin', async ({
+    page,
+  }) => {
     await page.goto('/admin');
     await expect(page.getByRole('heading', { name: 'Tuning Console', level: 4 })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Demo Data', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Signal Weights', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Thresholds', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Demo Data' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Users & Devices', exact: true })).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'Live Preview Summary', exact: true }),
-    ).toBeVisible();
+    await expect(page.getByTestId('preview-summary-banner')).toBeVisible();
   });
 
-  test('seed form creates a user, device row exposes signature and public ip', async ({ page }) => {
+  test('seed form creates a user, auto-expanded device row exposes signature and public ip', async ({
+    page,
+  }) => {
     await page.goto('/admin');
     await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
+    await openDemoDataAccordion(page);
 
     await page.getByLabel('User name').fill('demo-user-e2e-signature');
     await page.getByRole('button', { name: 'Seed' }).click();
@@ -94,9 +104,12 @@ test.describe('Tuning Console', () => {
     // Last result chip is rendered
     await expect(page.getByText('Last result')).toBeVisible();
 
-    // Expand the user row and verify the device row shows signature + ip
-    await page.getByText('demo-user-e2e-signature').click();
-    const deviceRow = page.locator('[data-testid^="device-row-"]').first();
+    // No click needed — users auto-expand on load. Scope to the seeded
+    // user's section so leftover users from earlier tests don't pollute.
+    const deviceRow = page
+      .getByTestId('user-section-demo-user-e2e-signature')
+      .locator('[data-testid^="device-row-"]')
+      .first();
     await expect(deviceRow).toBeVisible({ timeout: 10_000 });
     // Non-VPN public IP is the backend's NON_VPN_IP constant
     await expect(deviceRow).toContainText('ip: 203.0.113.42');
@@ -107,6 +120,7 @@ test.describe('Tuning Console', () => {
   test('seeding two different browsers produces two user rows', async ({ page }) => {
     await page.goto('/admin');
     await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
+    await openDemoDataAccordion(page);
 
     // First: Chrome regular
     await page.getByLabel('User name').fill('demo-user-e2e-chrome');
@@ -129,6 +143,7 @@ test.describe('Tuning Console', () => {
   test('invalid user name disables Seed and surfaces helper text', async ({ page }) => {
     await page.goto('/admin');
     await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
+    await openDemoDataAccordion(page);
 
     const input = page.getByLabel('User name');
     await input.fill('nithya');
@@ -139,6 +154,7 @@ test.describe('Tuning Console', () => {
   test('clear-all dialog Cancel preserves data', async ({ page }) => {
     await page.goto('/admin');
     await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
+    await openDemoDataAccordion(page);
 
     await page.getByLabel('User name').fill('demo-user-e2e-cancel');
     await page.getByRole('button', { name: 'Seed' }).click();
@@ -146,11 +162,8 @@ test.describe('Tuning Console', () => {
 
     await page.getByRole('button', { name: 'Clear all demo data' }).click();
     await expect(page.getByRole('heading', { name: 'Clear all demo data?' })).toBeVisible();
-    // Count should be reflected in the dialog body. Tolerant of pre-existing
-    // demo data that other test files may have left behind.
-    await expect(
-      page.getByText(/\d+ user\(s\), \d+ device\(s\), \d+ fingerprint\(s\)/),
-    ).toBeVisible();
+    // Dialog body shows the count summary
+    await expect(page.getByText(/This will delete \d+ user/)).toBeVisible();
     await page.getByRole('button', { name: 'Cancel' }).click();
     // Dialog closes, user still there
     await expect(page.getByRole('heading', { name: 'Clear all demo data?' })).toHaveCount(0);
@@ -160,6 +173,7 @@ test.describe('Tuning Console', () => {
   test('clear-all dialog Confirm empties the demo data', async ({ page }) => {
     await page.goto('/admin');
     await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
+    await openDemoDataAccordion(page);
 
     await page.getByLabel('User name').fill('demo-user-e2e-confirm');
     await page.getByRole('button', { name: 'Seed' }).click();
@@ -179,6 +193,7 @@ test.describe('Tuning Console', () => {
   test('ripple effect preview fires when canvas_hash slider moves', async ({ page }) => {
     await page.goto('/admin');
     await expect(page.getByLabel('canvas_hash weight')).toBeVisible({ timeout: 15_000 });
+    await openDemoDataAccordion(page);
 
     // Seed two visits for the same user so the device has >=2 fingerprints
     // (the preview endpoint only reclassifies devices with >=2 fingerprints).

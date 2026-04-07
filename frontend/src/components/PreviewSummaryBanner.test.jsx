@@ -3,13 +3,16 @@ import { describe, it, expect } from 'vitest';
 import PreviewSummaryBanner from './PreviewSummaryBanner';
 
 describe('PreviewSummaryBanner', () => {
-  it('renders the idle hint when summary is null', () => {
+  it('renders the idle hint and high-leverage tip when summary is null', () => {
     render(<PreviewSummaryBanner summary={null} />);
     expect(screen.getByTestId('preview-summary-banner')).toBeInTheDocument();
     expect(screen.getByText(/Drag any weight or threshold slider/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/canvas_hash \(90\), webgl_renderer \(85\), and touch_support \(70\)/),
+    ).toBeInTheDocument();
   });
 
-  it('renders a "no impact" state when affectedDevices is 0', () => {
+  it('renders a "no impact" state with the tip when affectedDevices is 0', () => {
     render(
       <PreviewSummaryBanner
         summary={{
@@ -24,6 +27,9 @@ describe('PreviewSummaryBanner', () => {
     );
     expect(screen.getByText(/no impact/)).toBeInTheDocument();
     expect(screen.getByText(/3 device\(s\)/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/canvas_hash \(90\), webgl_renderer \(85\), and touch_support \(70\)/),
+    ).toBeInTheDocument();
   });
 
   it('renders the affected counts', () => {

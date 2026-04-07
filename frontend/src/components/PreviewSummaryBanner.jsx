@@ -1,5 +1,9 @@
 import Alert from '@mui/material/Alert';
 import AlertTitle from '@mui/material/AlertTitle';
+import Box from '@mui/material/Box';
+
+const HIGH_LEVERAGE_TIP =
+  'Tip: the high-leverage signals are canvas_hash (90), webgl_renderer (85), and touch_support (70). The bottom 6 sliders barely move the score.';
 
 export default function PreviewSummaryBanner({ summary }) {
   const affected = summary?.affectedDevices ?? 0;
@@ -10,6 +14,7 @@ export default function PreviewSummaryBanner({ summary }) {
         <AlertTitle>Live Preview</AlertTitle>
         Drag any weight or threshold slider. The impact on existing devices will appear here and
         highlight rows in Users &amp; Devices.
+        <Box sx={{ mt: 1, fontStyle: 'italic', opacity: 0.85 }}>{HIGH_LEVERAGE_TIP}</Box>
       </Alert>
     );
   }
@@ -21,6 +26,7 @@ export default function PreviewSummaryBanner({ summary }) {
         Your proposed config matches the current config for all {summary.totalDevices ?? 0}{' '}
         device(s) across {summary.totalUsers ?? 0} user(s). Drag a slider further to flip a
         classification.
+        <Box sx={{ mt: 1, fontStyle: 'italic', opacity: 0.85 }}>{HIGH_LEVERAGE_TIP}</Box>
       </Alert>
     );
   }

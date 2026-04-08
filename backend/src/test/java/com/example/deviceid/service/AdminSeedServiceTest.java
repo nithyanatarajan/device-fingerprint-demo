@@ -37,7 +37,7 @@ class AdminSeedServiceTest {
   @Test
   void seedRejectsUserNameWithoutDemoPrefix() {
     assertThatThrownBy(
-            () -> adminSeedService.seed(new AdminSeedRequest("nithya", "chrome", false, false)))
+            () -> adminSeedService.seed(new AdminSeedRequest("bob", "chrome", false, false)))
         .isInstanceOf(ResponseStatusException.class)
         .extracting(e -> ((ResponseStatusException) e).getStatusCode())
         .isEqualTo(HttpStatus.BAD_REQUEST);

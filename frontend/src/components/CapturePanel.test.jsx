@@ -44,7 +44,7 @@ describe('CapturePanel', () => {
   it('enables the download button once payload and response are provided', () => {
     render(
       <CapturePanel
-        payload={{ name: 'nithya' }}
+        payload={{ name: 'testuser' }}
         response={{ matchResult: 'NEW_DEVICE' }}
         screenshotTargetRef={{ current: document.createElement('div') }}
       />,
@@ -58,7 +58,7 @@ describe('CapturePanel', () => {
     const fakeTarget = document.createElement('div');
     render(
       <CapturePanel
-        payload={{ name: 'nithya' }}
+        payload={{ name: 'testuser' }}
         response={{ matchResult: 'NEW_DEVICE' }}
         screenshotTargetRef={{ current: fakeTarget }}
       />,
@@ -94,7 +94,7 @@ describe('CapturePanel', () => {
     const user = userEvent.setup();
     render(
       <CapturePanel
-        payload={{ name: 'nithya' }}
+        payload={{ name: 'testuser' }}
         response={{ matchResult: 'NEW_DEVICE' }}
         screenshotTargetRef={{ current: null }}
       />,
@@ -116,7 +116,7 @@ describe('CapturePanel', () => {
 
     render(
       <CapturePanel
-        payload={{ name: 'nithya' }}
+        payload={{ name: 'testuser' }}
         response={{ matchResult: 'NEW_DEVICE' }}
         screenshotTargetRef={{ current: document.createElement('div') }}
       />,

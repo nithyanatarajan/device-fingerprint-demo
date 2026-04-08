@@ -53,7 +53,7 @@ class AdminSeedControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    {"userName": "nithya", "browser": "chrome", "vpn": false, "incognito": false}
+                    {"userName": "bob", "browser": "chrome", "vpn": false, "incognito": false}
                     """))
         .andExpect(status().isBadRequest());
   }

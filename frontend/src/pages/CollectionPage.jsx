@@ -8,6 +8,7 @@ import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import SignalBreakdown from '../components/SignalBreakdown';
 import SameMachinePanel from '../components/SameMachinePanel';
+import DistinctivenessPanel from '../components/DistinctivenessPanel';
 import CapturePanel from '../components/CapturePanel';
 import { collectFingerprint } from '../services/api';
 import { collectSignals, FingerprintBlockedError } from '../services/fingerprint';
@@ -161,6 +162,8 @@ export default function CollectionPage() {
           />
         </Box>
       )}
+
+      {result?.fingerprintId && <DistinctivenessPanel fingerprintId={result.fingerprintId} />}
 
       {signals && <SignalBreakdown signals={signals} changedSignals={result?.changedSignals} />}
 

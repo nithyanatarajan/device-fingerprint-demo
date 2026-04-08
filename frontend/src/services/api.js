@@ -88,3 +88,7 @@ export function seedScenario() {
 export function getDeviceInvestigation(userId, deviceId) {
   return request(`/api/users/${userId}/devices/${deviceId}/investigation`);
 }
+
+export function getSignalDistinctiveness(fingerprintId) {
+  return request(`/api/signals/distinctiveness?fingerprintId=${encodeURIComponent(fingerprintId)}`);
+}

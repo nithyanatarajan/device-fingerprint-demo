@@ -13,6 +13,17 @@ import html2canvas from 'html2canvas';
 const CAPTURE_DIR = import.meta.env.VITE_CAPTURE_DIR || 'docs/demo/recordings/';
 
 /**
+ * Small delay between consecutive downloads. Safari silently drops download
+ * clicks that fire in the same synchronous tick (it dedupes them), so each
+ * file needs its own moment in the event loop. 150ms is conservative —
+ * Chrome and Firefox don't need it, but the overhead is invisible to the
+ * user and it makes re-capture reliable in Safari.
+ */
+const DOWNLOAD_SPACING_MS = 150;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
  * Helper: creates a temporary anchor, clicks it, and revokes the URL. This is
  * the cross-browser-reliable way to trigger a file download from a Blob.
  */
@@ -66,12 +77,17 @@ export default function CapturePanel({ payload, response, screenshotTargetRef })
         new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }),
         `${n}_payload.json`,
       );
+      // Safari dedupes downloads fired in the same synchronous tick. Space
+      // the response download into its own tick so all three files land.
+      await sleep(DOWNLOAD_SPACING_MS);
       downloadBlob(
         new Blob([JSON.stringify(response, null, 2)], { type: 'application/json' }),
         `${n}_response.json`,
       );
 
       if (screenshotTargetRef?.current) {
+        // Same rationale — space the screenshot download from the response.
+        await sleep(DOWNLOAD_SPACING_MS);
         const canvas = await html2canvas(screenshotTargetRef.current, {
           backgroundColor: '#ffffff',
           scale: 2,

@@ -1,0 +1,13 @@
+{
+  "userId": "72b6cde1-5122-474d-bc03-a607d14f02a1",
+  "deviceId": "a9144583-acba-4a4f-b79b-ebe9b582e0c5",
+  "deviceLabel": "Chrome on MacOS",
+  "matchResult": "NEW_DEVICE",
+  "score": 0,
+  "signalComparisons": [],
+  "changedSignals": [],
+  "machineMatch": {
+    "strongMatches": [],
+    "possibleMatches": []
+  }
+}

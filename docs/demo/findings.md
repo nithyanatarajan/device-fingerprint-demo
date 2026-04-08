@@ -1,26 +1,26 @@
 # Phase 2 findings from manual testing
 
-Analysis of the 10 scenarios captured in this directory. The raw data lives in [`scenarios.md`](scenarios.md) and the `N_payload.json` / `N.png` companion files.
+Analysis of the 11 scenarios captured in this directory. The raw data lives in [`scenarios.md`](scenarios.md) and the [`recordings/`](recordings/) folder (one `N_payload.json` / `N_response.json` / `N.png` triple per scenario).
 
 ## 1. `fontHash` is stable across every browser and every privacy mode
 
-All 10 captured payloads report `"fontHash":"foxefv"` — Chrome, Firefox, Safari, Chrome Incognito, Firefox Private, and Safari Private alike. This is the single strongest validation that `document.fonts.check()` is cross-browser stable and that adding `fontHash` to the machine signature was the right call. It is the only entropy-increasing signal that survives every browser's anti-fingerprinting mode.
+All 11 captured payloads report `"fontHash":"foxefv"` — Chrome, Firefox, Safari, Chrome Incognito, Firefox Private, and Safari Private alike. This is the single strongest validation that `document.fonts.check()` is cross-browser stable and that adding `fontHash` to the machine signature was the right call. It is the only entropy-increasing signal that survives every browser's anti-fingerprinting mode.
 
 ## 2. Per-user scoping enforces privacy without losing signal
 
-Scenario 7's payload (`alice`) shares **every hash input** with scenarios 1/2/5/6/8 (`nithya` on Chrome). Same canvas, same WebGL, same screen resolution, same pixel ratio, same touch support, same font hash. Yet Phase 2 correctly hides the panel because `alice` and `nithya` are different users and per-user scoping never crosses the boundary. The hash match is real; the surfacing is refused. That is the privacy guarantee working as designed.
+Scenario 8's payload (`alice`) shares **every hash input** with scenarios 1/2/5/7/9 (`nithya` on Chrome). Same canvas, same WebGL, same screen resolution, same pixel ratio, same touch support, same font hash. Yet Phase 2 correctly hides the panel because `alice` and `nithya` are different users and per-user scoping never crosses the boundary. The hash match is real; the surfacing is refused. That is the privacy guarantee working as designed.
 
 ## 3. Chrome Incognito is byte-identical to regular Chrome
 
-Scenarios 1, 2, 5, 6, 7, and 8 have **identical** `/api/collect` request bodies (modulo the `name` field). Chrome Incognito does not alter a single collected signal — no canvas noise, no WebGL masking, no hardware coarsening. Incognito is about cookies and history; it is not an anti-fingerprinting feature. Phase 1 lands `SAME_DEVICE` and Phase 2 lands `SAME_MACHINE` because there is literally nothing different to detect.
+Scenarios 1, 2, 5, 7, 8, and 9 have **identical** `/api/collect` request bodies (modulo the `name` field). Chrome Incognito does not alter a single collected signal — no canvas noise, no WebGL masking, no hardware coarsening. Incognito is about cookies and history; it is not an anti-fingerprinting feature. Phase 1 lands `SAME_DEVICE` and Phase 2 lands `SAME_MACHINE` because there is literally nothing different to detect.
 
 ## 4. Firefox Private is the cleanest two-voices demo — and fontHash survives it
 
-Firefox's Resist Fingerprinting protections kick in for private windows. Comparing `3_payload.json` (Firefox normal) to `9_payload.json` (Firefox Private):
+Firefox's Resist Fingerprinting protections kick in for private windows. Comparing [`recordings/3_payload.json`](recordings/3_payload.json) (Firefox normal) to [`recordings/10_payload.json`](recordings/10_payload.json) (Firefox Private):
 
 | Field | Firefox normal | Firefox Private | In Phase 2 hash? |
 |---|---|---|---|
-| `canvasHash` | `m26ikj` | `wdprtt` | ❌ no |
+| `canvasHash` | `m26ikj` | `vysarh` (randomized) | ❌ no |
 | `hardwareConcurrency` | `12` | **`8`** (RFP cap) | ❌ no |
 | `platform` | `MacIntel` | `MacIntel` | ✅ yes |
 | `screenResolution` | `1728x1117` | `1728x1117` | ✅ yes |
@@ -39,7 +39,7 @@ Both voices are correct from their own perspective. Phase 1 is flagging the sess
 
 This was the surprise of the test. The hypothesis going in was that Safari Private would defeat Phase 2 by corrupting `fontHash`. It does not — `fontHash` survives. The culprit is `screenResolution`.
 
-Comparing `4_payload.json` (Safari normal) to `10_payload.json` (Safari Private):
+Comparing [`recordings/4_payload.json`](recordings/4_payload.json) (Safari normal) to [`recordings/11_payload.json`](recordings/11_payload.json) (Safari Private):
 
 | Field | Safari normal | Safari Private |
 |---|---|---|
@@ -52,12 +52,12 @@ Safari Private is reporting `1728x649` — almost certainly the browser viewport
 
 ## 6. Network identity is orthogonal to browser fingerprint
 
-`3_payload.json` (Firefox, VPN off) and `3b_payload.json` (Firefox, VPN on) are **byte-identical**. Same canvas hash, same WebGL renderer, same hardware concurrency, same font hash, same everything the browser can observe. The VPN does not change a single JavaScript-observable signal.
+[`recordings/3_payload.json`](recordings/3_payload.json) (Firefox, VPN off) and [`recordings/6_payload.json`](recordings/6_payload.json) (Firefox, VPN on) are **byte-identical**. Same canvas hash, same WebGL renderer, same hardware concurrency, same font hash, same everything the browser can observe. The VPN does not change a single JavaScript-observable signal.
 
 Yet Phase 2's verdict differs:
 
 - Scenario 3: `SAME_MACHINE` (strong tier)
-- Scenario 3b: `MATCHING_HARDWARE` (possible tier, panel header flipped)
+- Scenario 6: `MATCHING_HARDWARE` (possible tier, panel header flipped)
 
 The only thing that differs between the two requests is the source IP of the TCP connection reaching ngrok — which ngrok forwards to the backend via `X-Forwarded-For`. That header is set from network-layer data the browser never sees and cannot fabricate.
 

@@ -1,0 +1,19 @@
+{
+  "name": "nithya",
+  "canvasHash": "m26ikj",
+  "webglRenderer": "Apple M1, or similar",
+  "screenResolution": "1728x1117",
+  "colorDepth": 30,
+  "pixelRatio": 2,
+  "timezone": "Asia/Kolkata",
+  "locale": "en-US",
+  "platform": "MacIntel",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:151.0) Gecko/20100101 Firefox/151.0",
+  "hardwareConcurrency": 12,
+  "deviceMemory": null,
+  "touchSupport": 0,
+  "codecSupport": "video/webm;codecs=vp8,audio/webm;codecs=opus",
+  "dntEnabled": true,
+  "cookieEnabled": true,
+  "fontHash": "foxefv"
+}

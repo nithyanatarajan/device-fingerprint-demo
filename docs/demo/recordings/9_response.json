@@ -1,0 +1,127 @@
+{
+  "userId": "72b6cde1-5122-474d-bc03-a607d14f02a1",
+  "deviceId": "a9144583-acba-4a4f-b79b-ebe9b582e0c5",
+  "deviceLabel": "Chrome on MacOS",
+  "matchResult": "SAME_DEVICE",
+  "score": 100,
+  "signalComparisons": [
+    {
+      "signalName": "canvas_hash",
+      "score": 1,
+      "value1": "6qyv9m",
+      "value2": "6qyv9m"
+    },
+    {
+      "signalName": "webgl_renderer",
+      "score": 1,
+      "value1": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+      "value2": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)"
+    },
+    {
+      "signalName": "screen_resolution",
+      "score": 1,
+      "value1": "1728x1117",
+      "value2": "1728x1117"
+    },
+    {
+      "signalName": "color_depth",
+      "score": 1,
+      "value1": 30,
+      "value2": 30
+    },
+    {
+      "signalName": "pixel_ratio",
+      "score": 1,
+      "value1": 2,
+      "value2": 2
+    },
+    {
+      "signalName": "timezone",
+      "score": 1,
+      "value1": "Asia/Calcutta",
+      "value2": "Asia/Calcutta"
+    },
+    {
+      "signalName": "locale",
+      "score": 1,
+      "value1": "en-GB",
+      "value2": "en-GB"
+    },
+    {
+      "signalName": "platform",
+      "score": 1,
+      "value1": "MacIntel",
+      "value2": "MacIntel"
+    },
+    {
+      "signalName": "user_agent",
+      "score": 1,
+      "value1": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+      "value2": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+    },
+    {
+      "signalName": "hardware_concurrency",
+      "score": 1,
+      "value1": 12,
+      "value2": 12
+    },
+    {
+      "signalName": "device_memory",
+      "score": 1,
+      "value1": 8,
+      "value2": 8
+    },
+    {
+      "signalName": "touch_support",
+      "score": 1,
+      "value1": 0,
+      "value2": 0
+    },
+    {
+      "signalName": "codec_support",
+      "score": 1,
+      "value1": "video/webm;codecs=vp8,video/webm;codecs=vp9,video/webm;codecs=h264,audio/webm;codecs=opus",
+      "value2": "video/webm;codecs=vp8,video/webm;codecs=vp9,video/webm;codecs=h264,audio/webm;codecs=opus"
+    },
+    {
+      "signalName": "dnt_enabled",
+      "score": 1,
+      "value1": false,
+      "value2": false
+    },
+    {
+      "signalName": "cookie_enabled",
+      "score": 1,
+      "value1": true,
+      "value2": true
+    }
+  ],
+  "changedSignals": [],
+  "machineMatch": {
+    "strongMatches": [
+      {
+        "userId": "72b6cde1-5122-474d-bc03-a607d14f02a1",
+        "userName": "nithya",
+        "deviceId": "a9144583-acba-4a4f-b79b-ebe9b582e0c5",
+        "deviceLabel": "Chrome on MacOS",
+        "lastSeenAt": "2026-04-08T07:45:38.077664Z"
+      }
+    ],
+    "possibleMatches": [
+      {
+        "userId": "72b6cde1-5122-474d-bc03-a607d14f02a1",
+        "userName": "nithya",
+        "deviceId": "518914f0-bad1-46bd-ad65-ffed0ad3e210",
+        "deviceLabel": "Firefox on MacOS",
+        "lastSeenAt": "2026-04-08T07:45:14.985652Z"
+      },
+      {
+        "userId": "72b6cde1-5122-474d-bc03-a607d14f02a1",
+        "userName": "nithya",
+        "deviceId": "76fe8f8f-893e-489f-a85f-5b00ffb099cc",
+        "deviceLabel": "Safari on MacOS",
+        "lastSeenAt": "2026-04-08T07:44:24.665137Z"
+      }
+    ]
+  }
+}

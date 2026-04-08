@@ -1,0 +1,21 @@
+{
+  "userId": "72b6cde1-5122-474d-bc03-a607d14f02a1",
+  "deviceId": "518914f0-bad1-46bd-ad65-ffed0ad3e210",
+  "deviceLabel": "Firefox on MacOS",
+  "matchResult": "NEW_DEVICE",
+  "score": 0,
+  "signalComparisons": [],
+  "changedSignals": [],
+  "machineMatch": {
+    "strongMatches": [
+      {
+        "userId": "72b6cde1-5122-474d-bc03-a607d14f02a1",
+        "userName": "nithya",
+        "deviceId": "a9144583-acba-4a4f-b79b-ebe9b582e0c5",
+        "deviceLabel": "Chrome on MacOS",
+        "lastSeenAt": "2026-04-08T07:43:02.559692Z"
+      }
+    ],
+    "possibleMatches": []
+  }
+}

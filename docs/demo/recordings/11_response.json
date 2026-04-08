@@ -1,0 +1,100 @@
+{
+  "userId": "72b6cde1-5122-474d-bc03-a607d14f02a1",
+  "deviceId": "76fe8f8f-893e-489f-a85f-5b00ffb099cc",
+  "deviceLabel": "Safari on MacOS",
+  "matchResult": "SAME_DEVICE",
+  "score": 92.98245614035088,
+  "signalComparisons": [
+    {
+      "signalName": "canvas_hash",
+      "score": 1,
+      "value1": "mg0lca",
+      "value2": "mg0lca"
+    },
+    {
+      "signalName": "webgl_renderer",
+      "score": 1,
+      "value1": "Apple GPU",
+      "value2": "Apple GPU"
+    },
+    {
+      "signalName": "screen_resolution",
+      "score": 0,
+      "value1": "1728x1117",
+      "value2": "1728x1003"
+    },
+    {
+      "signalName": "color_depth",
+      "score": 1,
+      "value1": 24,
+      "value2": 24
+    },
+    {
+      "signalName": "pixel_ratio",
+      "score": 1,
+      "value1": 2,
+      "value2": 2
+    },
+    {
+      "signalName": "timezone",
+      "score": 1,
+      "value1": "Asia/Calcutta",
+      "value2": "Asia/Calcutta"
+    },
+    {
+      "signalName": "locale",
+      "score": 1,
+      "value1": "en-IN",
+      "value2": "en-IN"
+    },
+    {
+      "signalName": "platform",
+      "score": 1,
+      "value1": "MacIntel",
+      "value2": "MacIntel"
+    },
+    {
+      "signalName": "user_agent",
+      "score": 1,
+      "value1": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.3.1 Safari/605.1.15",
+      "value2": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.3.1 Safari/605.1.15"
+    },
+    {
+      "signalName": "hardware_concurrency",
+      "score": 1,
+      "value1": 8,
+      "value2": 8
+    },
+    {
+      "signalName": "touch_support",
+      "score": 1,
+      "value1": 0,
+      "value2": 0
+    },
+    {
+      "signalName": "codec_support",
+      "score": 1,
+      "value1": "video/webm;codecs=vp8,video/webm;codecs=vp9,audio/webm;codecs=opus",
+      "value2": "video/webm;codecs=vp8,video/webm;codecs=vp9,audio/webm;codecs=opus"
+    },
+    {
+      "signalName": "dnt_enabled",
+      "score": 1,
+      "value1": false,
+      "value2": false
+    },
+    {
+      "signalName": "cookie_enabled",
+      "score": 1,
+      "value1": true,
+      "value2": true
+    }
+  ],
+  "changedSignals": [
+    "screen_resolution"
+  ],
+  "machineMatch": {
+    "strongMatches": [],
+    "possibleMatches": []
+  }
+}

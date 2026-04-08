@@ -19,3 +19,6 @@
 docs/superpowers
 .claude
 .aide.yaml
+
+# Local-only demo narratives (presenter-personal, not published)
+docs/demo/narratives.md

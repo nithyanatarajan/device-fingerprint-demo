@@ -6,6 +6,12 @@ import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import html2canvas from 'html2canvas';
 
+// Target directory shown in the helper text. Read from VITE_CAPTURE_DIR so
+// the presenter can override it via an env file (frontend/.env, .env.local,
+// or the root envrc.sample) without editing code when the captures folder
+// gets reorganised. Defaults to the current docs/demo/recordings/ layout.
+const CAPTURE_DIR = import.meta.env.VITE_CAPTURE_DIR || 'docs/demo/recordings/';
+
 /**
  * Helper: creates a temporary anchor, clicks it, and revokes the URL. This is
  * the cross-browser-reliable way to trigger a file download from a Blob.
@@ -111,7 +117,7 @@ export default function CapturePanel({ payload, response, screenshotTargetRef })
       </Typography>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
         Downloads <code>N_payload.json</code>, <code>N_response.json</code>, <code>N.png</code> to
-        your Downloads folder. Move them into <code>docs/demo/</code> after.
+        your Downloads folder. Move them into <code>{CAPTURE_DIR}</code> after.
       </Typography>
       <TextField
         size="small"

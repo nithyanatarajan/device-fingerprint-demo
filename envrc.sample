@@ -21,3 +21,9 @@ export DDL_AUTO=update
 # file written by `ngrok config add-authtoken <token>`. Set this only if
 # you want the env var to take precedence over the config file.
 # export NGROK_AUTHTOKEN='your-ngrok-token-here'
+
+# --- Frontend capture mode ------------------------------------------------
+# The Collect page's ?capture=1 helper tells you where to move downloaded
+# scenario files. Override the default target directory here if you
+# reorganise the docs layout. Vite picks this up at build time.
+# export VITE_CAPTURE_DIR='docs/demo/recordings/'

@@ -14,6 +14,8 @@ A short AI-assisted build demo showcasing that a single developer with AI can bu
 
 **Meta-demo:** The brainstorming -> spec -> plan -> TDD workflow used to build this is itself part of the pitch.
 
+**Demo assets:** The Phase 2 scenario matrix and the curated Phase 3/4 seed table are in [`docs/demo/scenarios.md`](docs/demo/scenarios.md); captured request/response payloads and screenshots per scenario live in [`docs/demo/recordings/`](docs/demo/recordings/).
+
 ---
 
 ## What We're Building
@@ -253,12 +255,11 @@ Recognizes the same **hardware** across different browsers for the **same user**
 The previous Phase 3 (Tuning Console) and Phase 4 (Ripple Effect) are merged into a single phase because they ship together — sliders without live preview are a flat demo, and the live preview is the headline moment. Admin Seed is folded in alongside because the Tuning Console and Ripple Effect both need populated data to be meaningful.
 
 **Tuning Console (frontend admin page at `/admin`):**
-- Signal weight sliders (0-100 per signal) with clear indication these are relative
-- Enable/disable toggle per signal
-- Same-device threshold slider, drift threshold slider, with the constraint same-device ≥ drift
-- Reset to defaults button
-- Per-user device list: GET `/api/users`, expand a user → GET `/api/users/{id}/devices`. Each device row shows label, machine signature (truncated), public IP, last seen, visit count
-- Save configuration → persists via `PUT /api/scoring/weights` and `PUT /api/scoring/config`
+- Two tabs: **Tune** (sliders + users/devices) and **Demo Data** (seed form + curated scenario + clear-all). Both tab panels stay mounted across tab switches so slider state and in-progress forms survive.
+- Tune tab, two-column layout:
+  - Left: Signal Weights section (0-100 slider + enable/disable toggle per signal) and Thresholds section (same-device slider, drift slider, with the constraint same-device ≥ drift enforced client-side). Each section has its own Reset-to-defaults and Save buttons.
+  - Right: Users & Devices list. Users come from `GET /api/users`; devices come from `GET /api/users/{id}/devices`. Each device row is compact by default — it shows the device label, a composite score number (from the live ripple-effect preview), and before→after classification chips when the preview has flipped that device. Full signal evidence (sig, ip, last seen, visit count, the 15-signal comparison table) is one click away via the Investigation modal in Phase 4.
+- Save persists weights via `PUT /api/scoring/weights` and thresholds via `PUT /api/scoring/config`. Reset restores canonical defaults via `POST /api/scoring/weights/reset` and `POST /api/scoring/config/reset`.
 
 **Ripple Effect (live preview without persisting):**
 - As the admin drags any weight or threshold slider, the frontend sends the proposed config to `POST /api/scoring/preview` (debounced 300ms)
@@ -268,17 +269,22 @@ The previous Phase 3 (Tuning Console) and Phase 4 (Ripple Effect) are merged int
 - Preview never persists; only Save commits the change
 
 **Admin Seed (frontend form + backend endpoints):**
-- Demo Data section at the top of the Tuning Console with a 4-input form: `userName` (defaults to `demo-user-alpha`, server enforces the `demo-user-` prefix), `browser` (Chrome / Firefox / Safari), `vpn` (toggle), `incognito` (toggle)
-- Submit creates one synthetic fingerprint by calling `POST /api/admin/seed`. Backend builds a `CollectRequest` from canonical templates per (browser × incognito) using the real captured payloads from `docs/demo/`, picks the public IP based on the VPN flag, and calls `CollectionService.collect()` internally. This means seeded data flows through the exact same scoring/matching code path as real visits and is indistinguishable in the database.
+- Lives in the **Demo Data tab** of the Tuning Console, kept separate from the Tune tab so it never competes for attention during the live walkthrough.
+- Top section: **Curated scenario seed** — a single "Seed demo scenario" button that calls `POST /api/admin/seed/scenario`. One click wipes all existing `demo-user-*` data and seeds 7 curated users designed to sit at varied points on the score curve (`demo-user-stable`, `demo-user-canvas-drift`, `demo-user-webgl-only`, `demo-user-touch-only`, `demo-user-os-update`, `demo-user-cross-browser`, `demo-user-major-drift`). Each user has 2 fingerprints on a single device so the preview service can score them. See [`docs/demo/scenarios.md`](docs/demo/scenarios.md) for the full table of expected scores and headline levers.
+- Below it: **Per-user seed form** — a 4-input form for fine-grained scenarios: `userName` (server enforces the `demo-user-` prefix; the UI pins the prefix as a non-editable adornment so the user only types the suffix), `browser` (Chrome / Firefox / Safari), `vpn` (toggle), `incognito` (toggle).
+- Submit calls `POST /api/admin/seed`. The backend reads a canonical per-(browser × incognito) template from `backend/src/main/resources/seed-templates/` (Spring classpath resource), sets the public IP based on the VPN flag, and calls `CollectionService.collect()` internally. The template files were originally captured as real browser fingerprints and sit in the backend resources so the seed flow is purely classpath-driven at runtime — no filesystem dependency on `docs/demo/`.
 - The form's "Last result" shows the live `CollectResponse` with the same chips and panel state the collection page would show, so the audience can watch each seeded visit produce its outcome in real time.
-- Idempotent: the same `(userName, browser, incognito)` combination twice updates the existing fingerprint instead of duplicating.
-- `Clear all demo data` button opens an MUI confirmation Dialog (not a browser `confirm()`). Pre-populated with the count from `GET /api/admin/seed/summary`. On confirm, calls `DELETE /api/admin/seed` which cascading-deletes every user whose name starts with `demo-user-` along with their devices and fingerprints.
-- The `demo-user-` prefix is enforced server-side on all three endpoints. There is no way for a typo to accidentally affect real users.
+- Re-seeding the same `(userName, browser, incognito)` combination does not duplicate a device: the scoring engine classifies the second fingerprint as SAME_DEVICE and attaches it to the existing device, so the user ends up with one device and multiple fingerprints — the state the preview service needs to produce an explanation.
+- `Clear all demo data` button opens an MUI confirmation Dialog (not a browser `confirm()`). Pre-populated with the count from `GET /api/admin/seed/summary`. On confirm, calls `DELETE /api/admin/seed` which cascade-deletes every user whose name starts with `demo-user-` along with their devices and fingerprints.
+- The `demo-user-` prefix is enforced server-side on all four endpoints. There is no way for a typo to accidentally affect real users.
 
 **APIs added in Phase 3:**
 - `POST /api/scoring/preview` — accepts proposed weights + thresholds, returns re-scored before/after classifications per user. Does not persist.
+- `POST /api/scoring/weights/reset` — restores the canonical default weights and returns the new state. Backs the Tuning Console's Reset button.
+- `POST /api/scoring/config/reset` — restores the canonical default thresholds and returns the new state.
 - `GET /api/users/{id}` — user detail
 - `POST /api/admin/seed` — body `{ userName, browser, vpn, incognito }`, creates one synthetic fingerprint via `CollectionService.collect()`, returns the resulting `CollectResponse`
+- `POST /api/admin/seed/scenario` — wipes all `demo-user-*` data and seeds the 7-user curated scenario, returns the `CollectResponse` for each seeded visit
 - `DELETE /api/admin/seed` — cascades to delete all `demo-user-*` users + their devices + their fingerprints, returns counts
 - `GET /api/admin/seed/summary` — returns `{ users, devices, fingerprints }` counts of current `demo-user-*` data, used by the frontend to populate the confirmation dialog
 
@@ -357,5 +363,5 @@ A polished ~6–8 minute live demo arc covering Phase 1, Phase 2, and Phase 3. T
 - H2 database (zero setup, embedded). Default in-memory; opt into file-mode persistence via `DATABASE_URL` and `DDL_AUTO` env vars (see README) for demo prep that survives backend restarts.
 - React 19.2.4 with Material UI
 - No auth (it's a demo)
-- Synthetic data seeder lives in Phase 3 as the Admin Seed form inside the Tuning Console. Calls `CollectionService.collect()` internally with canonical templates from real captured payloads, so seeded data is indistinguishable from real visits in the database. Enforces a `demo-user-` prefix server-side so synthetic and real data never collide.
+- Synthetic data seeder lives in Phase 3 under the Tuning Console's Demo Data tab. Calls `CollectionService.collect()` internally with canonical templates shipped as classpath resources in `backend/src/main/resources/seed-templates/` (originally captured from real browser fingerprints), so seeded data flows through the exact same scoring/matching path as real visits and is indistinguishable in the database. Enforces a `demo-user-` prefix server-side so synthetic and real data never collide.
 - No SSE/websockets — simple request/response. Dashboard refreshes on navigation.

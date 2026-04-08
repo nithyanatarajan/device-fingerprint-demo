@@ -297,9 +297,7 @@ test.describe('Tuning Console', () => {
     // Find and click the os-update device row inside its user section
     const osUpdateSection = page.getByTestId('user-section-demo-user-os-update');
     await expect(osUpdateSection).toBeVisible({ timeout: 10_000 });
-    const deviceRowButton = osUpdateSection
-      .locator('[data-testid^="device-row-button-"]')
-      .first();
+    const deviceRowButton = osUpdateSection.locator('[data-testid^="device-row-button-"]').first();
     await deviceRowButton.click();
 
     // Investigation dialog opens

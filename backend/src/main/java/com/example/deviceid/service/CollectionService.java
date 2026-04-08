@@ -92,14 +92,15 @@ public class CollectionService {
       DeviceFingerprint savedFp = buildFingerprint(request, bestDevice);
       savedFp.setMachineSignature(machineSignatureService.computeSignature(savedFp));
       savedFp.setPublicIp(publicIp);
-      fingerprintRepository.save(savedFp);
+      DeviceFingerprint persistedFp = fingerprintRepository.save(savedFp);
 
       List<String> changedSignals = findChangedSignals(bestResult.signalComparisons());
-      MachineMatchResult machineMatch = machineMatchService.findMatches(savedFp);
+      MachineMatchResult machineMatch = machineMatchService.findMatches(persistedFp);
 
       return new CollectResponse(
           user.getId(),
           bestDevice.getId(),
+          persistedFp.getId(),
           bestDevice.getLabel(),
           bestResult.matchResult(),
           bestResult.score(),
@@ -116,13 +117,14 @@ public class CollectionService {
     DeviceFingerprint savedFp = buildFingerprint(request, newDevice);
     savedFp.setMachineSignature(machineSignatureService.computeSignature(savedFp));
     savedFp.setPublicIp(publicIp);
-    fingerprintRepository.save(savedFp);
+    DeviceFingerprint persistedFp = fingerprintRepository.save(savedFp);
 
-    MachineMatchResult machineMatch = machineMatchService.findMatches(savedFp);
+    MachineMatchResult machineMatch = machineMatchService.findMatches(persistedFp);
 
     return new CollectResponse(
         user.getId(),
         newDevice.getId(),
+        persistedFp.getId(),
         newDevice.getLabel(),
         MatchResult.NEW_DEVICE,
         0.0,

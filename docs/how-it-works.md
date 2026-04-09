@@ -156,6 +156,24 @@ Phase 1 says "I don't recognise this as one of your existing devices" — techni
 
 ---
 
-## Where Phase 3 takes this next
+## Phase 3 design: exploration over persistence
 
-Phase 3 adds the **Tuning Console**: sliders for per-signal weights and drift / same-device thresholds, with a **ripple effect preview** that re-scores every stored fingerprint against proposed weights and shows which classifications would flip. That's the right place to address Phase 1's borderline `DRIFT_DETECTED ↔ NEW_DEVICE` behaviour on cross-browser visits — bump browser-specific signal weights down or the drift threshold down and watch the impact live.
+The Tuning Console's scoring configuration (signal weights + thresholds) is deliberately **in-memory** — not persisted to the database. Every backend restart resets to canonical defaults. This is intentional:
+
+- The console is an **exploration tool**, not a configuration store. An admin drags sliders, watches the ripple effect, then either saves (writes to in-memory state for the session) or resets. There is no "deploy this config to production" workflow because there is no production.
+- Persistence would add schema, migration, and a "which config is active?" question that adds complexity with zero demo value. If this became a real product, config persistence would be a Phase 6+ concern alongside auth and multi-tenancy.
+- Reset-to-defaults is a one-click escape hatch. No "undo 47 incremental saves" problem.
+
+The ripple-effect preview re-scores every stored fingerprint per user against the proposed config and diffs the classifications. It never persists — only Save commits, and even then only to in-memory state.
+
+---
+
+## Signal distinctiveness: honest measurement
+
+The Collect-page distinctiveness panel measures how common each signal value is **against the live fingerprint table** — not against a reference population, not against industry benchmarks, not against fabricated entropy estimates.
+
+Why this design:
+
+- **No fabrication.** A Shannon entropy estimate requires a reference distribution. For 15 browser signals, no canonical reference exists. Publishing "your canvas hash has 18.2 bits of entropy" when that number comes from a curated dataset the user can't inspect is misleading. Collision counts against the local database are honest: *"1 of 12 stored fingerprints share your value"* is a verifiable statement.
+- **Small-N is acknowledged, not hidden.** With N = 1, every signal is trivially 100% distinctive. The panel says so and captions the data with *"Numbers become more meaningful as the sample grows."* This is not a defect — it is the truth about what the database knows.
+- **Two views, same data.** The counts/ratio toggle offers two framings of the same measurement — *"3 of 12"* vs *"25%"*. Neither adds information the other doesn't have; the toggle exists because some audiences scan tables of fractions more easily, others scan percentages.
